@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: traderpro
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DERIV_APP_ID
+        value: "1089"
+      - key: OAUTH_REDIRECT_URL
+        value: https://traderpro.onrender.com/redirect.html
