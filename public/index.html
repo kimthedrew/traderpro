@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0d12" />
+    <title>traderpro</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <nav>
+      <div class="container">
+        <div class="brand">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M4 25 L13 15.5 L18.5 21 L27 8" fill="none" stroke="#5b8def" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M20 8 H27 V15" fill="none" stroke="#5b8def" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>
+            <span class="brand-text">traderpro</span>
+            <span class="brand-sub">powered by Deriv</span>
+          </span>
+        </div>
+        <div class="nav-actions">
+          <button class="btn btn-outline" id="nav-login-btn" type="button">Log In</button>
+          <button class="btn btn-solid" id="nav-get-started-btn" type="button">Get Started</button>
+        </div>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="container">
+        <h1>Signals, copy trading, and bots for <span class="accent-text">Deriv synthetic indices.</span></h1>
+        <p>Connect your own Deriv account and trade with an edge. We never touch your funds — everything executes on the account you already control.</p>
+        <div class="hero-actions">
+          <button class="btn btn-solid btn-lg" id="hero-login-btn" type="button">Log In with Deriv</button>
+          <a class="btn btn-outline btn-lg" href="#ticker">See live prices</a>
+        </div>
+      </div>
+    </header>
+
+    <div class="ticker-wrap" id="ticker">
+      <div class="ticker-track" id="ticker-track"></div>
+    </div>
+
+    <section class="trust">
+      <div class="container trust-grid">
+        <div class="trust-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3l7 3.5v5c0 4.5-3 8-7 9.5-4-1.5-7-5-7-9.5v-5L12 3z"/><path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <h3>Non-custodial, always</h3>
+          <p>Your money stays in your Deriv account. We connect via OAuth, we never hold a balance.</p>
+        </div>
+        <div class="trust-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 19h16M7 15l3-4 3 3 4-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <h3>Real-time, not simulated</h3>
+          <p>Prices stream straight from Deriv's own WebSocket API — the ticker above is genuinely live.</p>
+        </div>
+        <div class="trust-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+          <h3>Built in the open</h3>
+          <p>No black-box signals. You'll always be able to see what a strategy is actually doing.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="container">
+        <p class="section-label">Roadmap</p>
+        <h2>What you get, and what's coming</h2>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="row"><h3>Signals</h3><span class="status-pill status-live">Live</span></div>
+            <p>Real-time alerts pushed to you — no live account access required to receive them.</p>
+          </div>
+          <div class="feature-card">
+            <div class="row"><h3>Copy Trading</h3><span class="status-pill status-building">Building</span></div>
+            <p>Mirror a leader account's trades onto your own, with per-account risk limits.</p>
+          </div>
+          <div class="feature-card">
+            <div class="row"><h3>Bot Builder</h3><span class="status-pill status-planned">Planned</span></div>
+            <p>A no-code strategy editor for automating your own trades end to end.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="container">
+        <div class="disclaimer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L14.7 3.86a2 2 0 00-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <p><strong>Risk disclaimer.</strong> Deriv offers complex derivatives, such as options and contracts for difference ("CFDs"). These products may not be suitable for all clients, and trading them puts you at risk. You may lose some or all of the money you invest in a trade. Never trade with money you cannot afford to lose.</p>
+        </div>
+      </div>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

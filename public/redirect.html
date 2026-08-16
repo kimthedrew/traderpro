@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>traderpro &mdash; connecting&hellip;</title>
+  </head>
+  <body>
+    <p>Connecting your Deriv account&hellip;</p>
+    <script>
+      // Deriv appends acct1/token1/cur1 (and acct2/token2/... for every
+      // account on the login, e.g. demo + real) as query params here.
+      // This demo keeps only the first account and stores it client-side;
+      // a real app should send the token to the backend instead of
+      // trusting the browser to hold onto it long-term.
+      const params = new URLSearchParams(window.location.search);
+      const account = params.get("acct1");
+      const token = params.get("token1");
+
+      if (account && token) {
+        localStorage.setItem("deriv_account", account);
+        localStorage.setItem("deriv_token", token);
+      }
+
+      window.location.replace("/");
+    </script>
+  </body>
+</html>
