@@ -53,15 +53,16 @@ Deriv uses a simplified redirect flow, not full OAuth2 code exchange:
 4. `public/redirect.html` picks up those params and stores them, then
    bounces back to `/`.
 
-This demo stores the token in `localStorage` for simplicity. **Before
-handling real user funds**, move token storage/handling server-side —
-never let a long-lived account token sit in the browser for a production
-app.
+The token never reaches browser JS: `redirect.html` posts it to
+`POST /api/session`, the server exchanges it for an authorized
+`DerivClient` connection via Deriv's `authorize` call, and the browser
+gets back only an httpOnly session cookie (`src/sessionStore.ts`).
+`GET /api/session` / `DELETE /api/session` cover login-state checks and
+logout. Sessions are in-memory only (see Persistence below) — they don't
+survive a server restart yet.
 
 ## Next steps (not built yet)
 
-- Send the token to the backend and call `authorize` on a per-user
-  `DerivClient` connection (rather than trusting the browser).
 - Signals: pick a strategy trigger, push it to subscribers (email/push/
   webhook) — no live account access required for this piece.
 - Copy trading: listen for a "leader" account's transaction stream and

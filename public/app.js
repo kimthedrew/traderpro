@@ -47,29 +47,47 @@ stream.addEventListener("tick", (event) => {
   updateTicker(symbol, quote);
 });
 
-// OAuth login. redirect.html stores the account/token pair it receives
-// back from Deriv into localStorage before bouncing here.
+// OAuth login. redirect.html exchanges the token Deriv hands back for an
+// httpOnly session cookie server-side -- the browser never sees it, so
+// login state here comes from asking the backend, not reading storage.
 const navLoginBtn = document.getElementById("nav-login-btn");
 const navGetStartedBtn = document.getElementById("nav-get-started-btn");
 const heroLoginBtn = document.getElementById("hero-login-btn");
+const allAuthButtons = [navLoginBtn, navGetStartedBtn, heroLoginBtn];
 
-fetch("/api/config")
-  .then((r) => r.json())
-  .then(({ oauthUrl }) => {
-    [navLoginBtn, navGetStartedBtn, heroLoginBtn].forEach((btn) => {
-      btn.addEventListener("click", () => {
-        window.location.href = oauthUrl;
-      });
-    });
-  });
+let oauthUrl = null;
+let loggedIn = false;
 
-const storedAccount = localStorage.getItem("deriv_account");
-const storedToken = localStorage.getItem("deriv_token");
-if (storedAccount && storedToken) {
-  navLoginBtn.textContent = storedAccount;
-  navGetStartedBtn.textContent = "Reconnect";
-  heroLoginBtn.textContent = "Reconnect Deriv Account";
+function goToLogin() {
+  if (oauthUrl) window.location.href = oauthUrl;
 }
+
+async function logOut() {
+  await fetch("/api/session", { method: "DELETE" });
+  window.location.reload();
+}
+
+function applyAuthState() {
+  allAuthButtons.forEach((btn) => {
+    btn.removeEventListener("click", goToLogin);
+    btn.removeEventListener("click", logOut);
+    btn.addEventListener("click", loggedIn ? logOut : goToLogin);
+  });
+}
+
+Promise.all([
+  fetch("/api/config").then((r) => r.json()),
+  fetch("/api/session").then((r) => r.json()),
+]).then(([config, session]) => {
+  oauthUrl = config.oauthUrl;
+  loggedIn = session.loggedIn;
+  if (loggedIn) {
+    navLoginBtn.textContent = session.loginid;
+    navGetStartedBtn.textContent = "Log Out";
+    heroLoginBtn.textContent = "Log Out";
+  }
+  applyAuthState();
+});
 
 // 3D tilt on the hero logo, following the cursor. Only on devices with a real
 // mouse -- touch screens get the CSS-only float/glow animation instead.
