@@ -70,3 +70,24 @@ if (storedAccount && storedToken) {
   navGetStartedBtn.textContent = "Reconnect";
   heroLoginBtn.textContent = "Reconnect Deriv Account";
 }
+
+// 3D tilt on the hero logo, following the cursor. Only on devices with a real
+// mouse -- touch screens get the CSS-only float/glow animation instead.
+const heroVisual = document.getElementById("hero-visual");
+const heroLogo = document.getElementById("hero-logo");
+const MAX_TILT_DEG = 12;
+
+if (heroVisual && heroLogo && window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+  heroVisual.addEventListener("mousemove", (event) => {
+    const rect = heroVisual.getBoundingClientRect();
+    const px = (event.clientX - rect.left) / rect.width - 0.5; // -0.5..0.5
+    const py = (event.clientY - rect.top) / rect.height - 0.5;
+    heroLogo.style.setProperty("--tilt-y", `${(px * MAX_TILT_DEG * 2).toFixed(2)}deg`);
+    heroLogo.style.setProperty("--tilt-x", `${(-py * MAX_TILT_DEG * 2).toFixed(2)}deg`);
+  });
+
+  heroVisual.addEventListener("mouseleave", () => {
+    heroLogo.style.setProperty("--tilt-x", "0deg");
+    heroLogo.style.setProperty("--tilt-y", "0deg");
+  });
+}
