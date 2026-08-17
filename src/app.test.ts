@@ -21,12 +21,13 @@ after(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
-test("GET /api/config returns an appId and a Deriv oauthUrl", async () => {
+test("GET /api/config returns the OAuth2 client pieces the frontend needs to build a PKCE authorize URL", async () => {
   const res = await fetch(`${baseUrl}/api/config`);
   assert.equal(res.status, 200);
   const body = await res.json();
-  assert.ok(body.appId);
-  assert.match(body.oauthUrl, /^https:\/\/oauth\.deriv\.com\//);
+  assert.match(body.authUrl, /^https:\/\/auth\.deriv\.com\//);
+  assert.ok(body.redirectUri);
+  assert.ok(body.scope);
 });
 
 test("GET /api/session with no cookie reports loggedIn: false", async () => {
@@ -35,7 +36,7 @@ test("GET /api/session with no cookie reports loggedIn: false", async () => {
   assert.deepEqual(await res.json(), { loggedIn: false });
 });
 
-test("POST /api/session without a token is rejected before touching Deriv", async () => {
+test("POST /api/session without a code/codeVerifier is rejected before touching Deriv", async () => {
   const res = await fetch(`${baseUrl}/api/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

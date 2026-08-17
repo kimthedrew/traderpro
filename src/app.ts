@@ -4,26 +4,33 @@ import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DerivClient } from "./derivClient.js";
 import { createSession, destroySession, getSession } from "./sessionStore.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export const APP_ID = process.env.DERIV_APP_ID ?? "1089";
+// DERIV_APP_ID is really an OAuth2 client_id (Deriv's dashboard just calls
+// it "App ID"). Registered per-app at https://developers.deriv.com.
+export const APP_ID = process.env.DERIV_APP_ID ?? "";
+export const REDIRECT_URI = process.env.OAUTH_REDIRECT_URL ?? "http://localhost:3000/redirect.html";
 const SESSION_COOKIE = "traderpro_sid";
 const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const DEMO_APP_ID = "1089";
 
-if (process.env.NODE_ENV === "production" && APP_ID === DEMO_APP_ID) {
+const DERIV_AUTH_URL = "https://auth.deriv.com/oauth2/auth";
+const DERIV_TOKEN_URL = "https://auth.deriv.com/oauth2/token";
+const DERIV_API_BASE = "https://api.derivws.com";
+// Least-privilege: only what login + displaying the account actually needs.
+const OAUTH_SCOPE = "trade account_manage";
+
+if (!APP_ID) {
   console.warn(
-    "WARNING: running in production on Deriv's shared demo app_id. " +
-      "Register your own at https://developers.deriv.com before real users rely on this.",
+    "WARNING: DERIV_APP_ID is not set -- Deriv login will fail. " +
+      "Register an app at https://developers.deriv.com and set DERIV_APP_ID to its App ID.",
   );
 }
 
 // Login attempts hit Deriv's own API per try, so a stricter limit than most
 // routes -- generous enough for someone with a few real accounts, tight
-// enough to blunt token-guessing/abuse.
+// enough to blunt code/token-guessing abuse.
 const sessionLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
 
 export const app = express();
@@ -32,32 +39,55 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// Frontend needs the app_id to build the OAuth login URL and to open its
-// own WebSocket connection later (e.g. once it has a user's token).
+// Frontend generates PKCE params itself (needs browser crypto/sessionStorage)
+// and builds the full authorize URL from these static pieces.
 app.get("/api/config", (_req, res) => {
   res.json({
-    appId: APP_ID,
-    oauthUrl: `https://oauth.deriv.com/oauth2/authorize?app_id=${APP_ID}`,
+    clientId: APP_ID,
+    redirectUri: REDIRECT_URI,
+    authUrl: DERIV_AUTH_URL,
+    scope: OAUTH_SCOPE,
   });
 });
 
-// The Deriv account token never reaches browser JS: redirect.html posts it
-// here, we exchange it for an authorized server-side DerivClient connection,
-// and hand the browser back only an httpOnly session cookie.
+// redirect.js posts the authorization code + PKCE verifier here (never the
+// browser's job to talk to Deriv's token endpoint directly). We exchange
+// them server-side for an access token, fetch the account, and hand the
+// browser back only an httpOnly session cookie -- it never sees the token.
 app.post("/api/session", sessionLimiter, async (req, res) => {
-  const { token } = req.body ?? {};
-  if (typeof token !== "string" || !token) {
-    res.status(400).json({ error: "Missing token" });
+  const { code, codeVerifier } = req.body ?? {};
+  if (typeof code !== "string" || !code || typeof codeVerifier !== "string" || !codeVerifier) {
+    res.status(400).json({ error: "Missing code or codeVerifier" });
     return;
   }
 
-  const client = new DerivClient(APP_ID);
   try {
-    await client.connect();
-    const authResult = await client.authorize(token);
-    const { loginid, currency, email } = authResult.authorize;
+    const tokenRes = await fetch(DERIV_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: APP_ID,
+        code,
+        code_verifier: codeVerifier,
+        redirect_uri: REDIRECT_URI,
+      }),
+    });
+    if (!tokenRes.ok) throw new Error(`Token exchange failed: HTTP ${tokenRes.status}`);
+    const { access_token: accessToken } = await tokenRes.json();
 
-    const sessionId = createSession({ loginid, currency, email, client });
+    const accountsRes = await fetch(`${DERIV_API_BASE}/trading/v1/options/accounts`, {
+      headers: { "Deriv-App-ID": APP_ID, Authorization: `Bearer ${accessToken}` },
+    });
+    if (!accountsRes.ok) throw new Error(`Fetching accounts failed: HTTP ${accountsRes.status}`);
+    const { data: accounts } = await accountsRes.json();
+    const account = accounts?.[0] ?? {};
+    // Exact field names aren't confirmed against a real login yet -- fall
+    // back gracefully across the likely variants instead of assuming one.
+    const loginid = account.loginid ?? account.login_id ?? account.id ?? "account";
+    const currency = account.currency ?? "";
+
+    const sessionId = createSession({ loginid, currency, accessToken });
     res.cookie(SESSION_COOKIE, sessionId, {
       httpOnly: true,
       sameSite: "lax",
@@ -66,9 +96,8 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
     });
     res.json({ loginid, currency });
   } catch (err) {
-    client.close();
-    console.error("Authorize failed:", err);
-    res.status(401).json({ error: "Invalid or expired Deriv token" });
+    console.error("Deriv OAuth login failed:", err);
+    res.status(401).json({ error: "Could not complete Deriv login" });
   }
 });
 

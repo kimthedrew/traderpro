@@ -6,6 +6,6 @@ services:
     plan: free
     envVars:
       - key: DERIV_APP_ID
-        value: "1089"
+        value: "33stOEdBBT6OJNq5sdS5f"
       - key: OAUTH_REDIRECT_URL
         value: https://traderpro.onrender.com/redirect.html

@@ -1,32 +1,40 @@
 # traderpro
 
 Deriv third-party trading app. Scaffold stage: live market-data feed +
-Deriv OAuth login. Planned build order: **signals &rarr; copy trading &rarr;
+Deriv OAuth2 login. Planned build order: **signals &rarr; copy trading &rarr;
 no-code bot builder**.
+
+Deriv migrated their API in 2026 to a REST + OAuth2/PKCE model (from the
+older single-WebSocket, `?app_id=` query-param API many older examples
+still reference). This project is built against the current API.
 
 ## What's here
 
-- `src/derivClient.ts` &mdash; thin wrapper around Deriv's WebSocket API
-  (`wss://ws.derivws.com/websockets/v3`): request/response matching via
-  `req_id`, ping keepalive, and an event emitter for streamed messages
-  (ticks, etc).
-- `src/server.ts` &mdash; Express server. Connects to Deriv on boot, subscribes
-  to ticks for `R_100`, and relays them to the browser over SSE at
-  `/api/stream`. Also serves `/api/config` (app_id + OAuth URL) to the
-  frontend.
+- `src/derivClient.ts` &mdash; thin wrapper around Deriv's **public**
+  WebSocket API (`wss://api.derivws.com/trading/v1/options/ws/public`):
+  request/response matching via `req_id`, ping keepalive, and an event
+  emitter for streamed messages (ticks, etc). No auth or app_id needed —
+  confirmed directly against the live endpoint.
+- `src/app.ts` &mdash; Express app. Subscribes to ticks and relays them to
+  the browser over SSE at `/api/stream`. Also serves `/api/config` (OAuth2
+  client pieces) and the `/api/session` endpoints that drive login.
+- `src/sessionStore.ts` &mdash; in-memory session store keyed by an httpOnly
+  cookie; holds each logged-in user's OAuth2 access token server-side.
 - `public/` &mdash; static frontend: live tick display, and a "Log in with
-  Deriv" button that walks through Deriv's OAuth redirect flow.
+  Deriv" button that runs the OAuth2 + PKCE flow.
 
 ## Setup
 
-1. Register your own app (don't ship on the shared demo `app_id`):
+1. Register your own app — there's no working shared/demo app_id for the
+   current API, even for local dev:
    - Go to the [Deriv API dashboard](https://developers.deriv.com) → log in
      with a Deriv account → **Register application**.
    - Set the app's **Redirect URL** to match `OAUTH_REDIRECT_URL` below
-     exactly (e.g. `http://localhost:3000/redirect.html` for local dev).
-   - Copy the resulting `app_id`.
+     exactly.
+   - Copy the resulting **App ID** (this is an OAuth2 `client_id`, despite
+     the name Deriv's dashboard gives it).
 
-2. Copy the env file and fill in your app_id:
+2. Copy the env file and fill in your App ID:
    ```
    cp .env.example .env
    ```
@@ -37,29 +45,42 @@ no-code bot builder**.
    npm run dev
    ```
 
-4. Open http://localhost:3000 — you should see live R_100 ticks
-   immediately (public data, no login needed), and can test the OAuth
-   button once your app_id/redirect URL are set.
+4. Open http://localhost:3000 — you should see live ticks immediately
+   (public data, no login needed). Testing the login button locally
+   requires a Redirect URL registered for `http://localhost:3000/redirect.html`
+   specifically (register a second app for this, or test login against a
+   deployed URL that matches your registered Redirect URL).
 
-## How the OAuth flow works here
+## How the OAuth2 + PKCE flow works here
 
-Deriv uses a simplified redirect flow, not full OAuth2 code exchange:
-
-1. Frontend sends the user to `https://oauth.deriv.com/oauth2/authorize?app_id=...`.
+1. `public/app.js` generates a PKCE `code_verifier` + `code_challenge` and a
+   random `state`, stashes the first two in `sessionStorage`, and sends the
+   user to `https://auth.deriv.com/oauth2/auth` with them.
 2. User logs in / approves on Deriv's site.
-3. Deriv redirects back to your registered Redirect URL with query params
-   `acct1`, `token1`, `cur1` (and `acct2`/`token2`/... if the user has
-   multiple accounts, e.g. demo + real).
-4. `public/redirect.html` picks up those params and stores them, then
-   bounces back to `/`.
+3. Deriv redirects back to the registered Redirect URL with `?code=...&state=...`.
+4. `public/redirect.js` checks `state` matches what was stored (CSRF check),
+   then posts `{ code, codeVerifier }` to the backend — never the browser's
+   job to talk to Deriv's token endpoint directly.
+5. `POST /api/session` exchanges those for an access token at
+   `https://auth.deriv.com/oauth2/token`, fetches the account via
+   `GET https://api.derivws.com/trading/v1/options/accounts`, and hands the
+   browser back only an httpOnly session cookie. The access token itself
+   never reaches browser JS.
+6. `GET /api/session` / `DELETE /api/session` cover login-state checks and
+   logout. Sessions are in-memory only (see Persistence below) — they don't
+   survive a server restart yet.
 
-The token never reaches browser JS: `redirect.html` posts it to
-`POST /api/session`, the server exchanges it for an authorized
-`DerivClient` connection via Deriv's `authorize` call, and the browser
-gets back only an httpOnly session cookie (`src/sessionStore.ts`).
-`GET /api/session` / `DELETE /api/session` cover login-state checks and
-logout. Sessions are in-memory only (see Persistence below) — they don't
-survive a server restart yet.
+Note: the exact field names in the `/accounts` response (`loginid` vs
+`login_id` vs `id`) haven't been confirmed against a real login yet —
+`src/app.ts` falls back across the likely variants. Worth double-checking
+once someone logs in for real, and tightening up if the guess was wrong.
+
+For real-time *authenticated* data (balance, portfolio — not built yet),
+Deriv's model is different from the ticker: request a short-lived,
+single-use OTP'd WebSocket URL via
+`POST /trading/v1/options/accounts/{accountId}/otp` (needs the access
+token), then connect to that URL directly. Not a long-lived authorized
+socket like the old API.
 
 ## Next steps (not built yet)
 
@@ -69,6 +90,6 @@ survive a server restart yet.
   replicate trades onto follower accounts' authorized connections, with
   per-follower risk limits.
 - Persistence (users, subscriptions, leader/follower config) — nothing
-  here is stored anywhere yet, it's all in-memory/localStorage.
+  here is stored anywhere yet, it's all in-memory.
 - Legal: risk disclaimers, ToS, and a jurisdiction-specific compliance
   check before charging anyone money for signals/copy trading.

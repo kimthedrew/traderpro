@@ -1,14 +1,14 @@
 import "dotenv/config";
-import { app, broadcast, APP_ID } from "./app.js";
+import { app, broadcast } from "./app.js";
 import { DerivClient } from "./derivClient.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
-// Public tick data -- no auth needed. Symbols shown in the homepage ticker tape.
+// Public tick data -- no auth or app_id needed. Symbols shown in the homepage ticker tape.
 const TICKER_SYMBOLS = ["R_100", "R_75", "R_50", "BOOM1000", "CRASH500", "JD100"];
 
 async function startDerivFeed() {
-  const deriv = new DerivClient(APP_ID);
+  const deriv = new DerivClient();
 
   deriv.on("tick", (msg) => {
     broadcast("tick", { symbol: msg.tick.symbol, quote: msg.tick.quote, epoch: msg.tick.epoch });
@@ -31,7 +31,7 @@ async function startDerivFeed() {
       console.error(`Failed to subscribe to ${TICKER_SYMBOLS[i]}:`, result.reason);
     }
   });
-  console.log(`Connected to Deriv API (app_id=${APP_ID}), streaming ${TICKER_SYMBOLS.join(", ")}`);
+  console.log(`Connected to Deriv public API, streaming ${TICKER_SYMBOLS.join(", ")}`);
 }
 
 startDerivFeed().catch((err) => {

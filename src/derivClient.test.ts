@@ -4,21 +4,15 @@ import { WebSocketServer } from "ws";
 import type { AddressInfo } from "node:net";
 import { DerivClient } from "./derivClient.js";
 
-// A minimal stand-in for Deriv's API: echoes req_id and replies according to
-// request shape, so DerivClient's request/response matching and event
-// re-emission can be tested without hitting the real network.
+// A minimal stand-in for Deriv's public WS API: echoes req_id and replies
+// according to request shape, so DerivClient's request/response matching
+// and event re-emission can be tested without hitting the real network.
 async function startMockDerivServer() {
   const wss = new WebSocketServer({ port: 0 });
   wss.on("connection", (ws) => {
     ws.on("message", (raw) => {
       const msg = JSON.parse(raw.toString());
-      if (msg.authorize) {
-        ws.send(JSON.stringify({
-          req_id: msg.req_id,
-          msg_type: "authorize",
-          authorize: { loginid: "CR900000", currency: "USD", email: "trader@example.com" },
-        }));
-      } else if (msg.ticks) {
+      if (msg.ticks) {
         ws.send(JSON.stringify({
           req_id: msg.req_id,
           msg_type: "tick",
@@ -35,23 +29,9 @@ async function startMockDerivServer() {
   return { wss, url: `ws://127.0.0.1:${port}` };
 }
 
-test("DerivClient: authorize resolves with the account payload", async () => {
-  const { wss, url } = await startMockDerivServer();
-  const client = new DerivClient("1089", url);
-  try {
-    await client.connect();
-    const result = await client.authorize("faketoken");
-    assert.equal(result.authorize.loginid, "CR900000");
-    assert.equal(result.authorize.currency, "USD");
-  } finally {
-    client.close();
-    await new Promise((resolve) => wss.close(resolve));
-  }
-});
-
 test("DerivClient: subscribeTicks resolves and matches req_id to the right request", async () => {
   const { wss, url } = await startMockDerivServer();
-  const client = new DerivClient("1089", url);
+  const client = new DerivClient(url);
   try {
     await client.connect();
     const [r100, r75] = await Promise.all([client.subscribeTicks("R_100"), client.subscribeTicks("R_75")]);
@@ -65,7 +45,7 @@ test("DerivClient: subscribeTicks resolves and matches req_id to the right reque
 
 test("DerivClient: emits msg_type events for streamed (subscribed) messages", async () => {
   const { wss, url } = await startMockDerivServer();
-  const client = new DerivClient("1089", url);
+  const client = new DerivClient(url);
   try {
     await client.connect();
     const tickEvent = new Promise((resolve) => client.once("tick", resolve));
@@ -80,7 +60,7 @@ test("DerivClient: emits msg_type events for streamed (subscribed) messages", as
 
 test("DerivClient: a request-level error rejects that request and emits api_error", async () => {
   const { wss, url } = await startMockDerivServer();
-  const client = new DerivClient("1089", url);
+  const client = new DerivClient(url);
   try {
     await client.connect();
     const apiError = new Promise((resolve) => client.once("api_error", resolve));
@@ -94,11 +74,11 @@ test("DerivClient: a request-level error rejects that request and emits api_erro
 });
 
 test("DerivClient: send() rejects if called before connect()", async () => {
-  const client = new DerivClient("1089", "ws://127.0.0.1:0");
+  const client = new DerivClient("ws://127.0.0.1:0");
   await assert.rejects(() => client.send({ ping: 1 }), /socket not open/);
 });
 
 test("DerivClient: connect() rejects when nothing is listening", async () => {
-  const client = new DerivClient("1089", "ws://127.0.0.1:1");
+  const client = new DerivClient("ws://127.0.0.1:1");
   await assert.rejects(() => client.connect());
 });

@@ -1,14 +1,12 @@
 import { randomBytes } from "node:crypto";
-import type { DerivClient } from "./derivClient.js";
 
 export type Session = {
   loginid: string;
   currency: string;
-  email?: string;
-  // Kept alive for the life of the session so future authorized calls
-  // (balance, portfolio, copy trading...) don't need to re-authorize.
-  // The raw token itself is never stored -- only this authorized connection.
-  client: DerivClient;
+  // The OAuth2 access token for this account. Never sent to the browser --
+  // used server-side for REST calls (e.g. requesting an OTP'd WebSocket URL
+  // for authenticated real-time data, once that's needed).
+  accessToken: string;
 };
 
 const sessions = new Map<string, Session>();
@@ -26,7 +24,5 @@ export function getSession(id: string | undefined): Session | undefined {
 
 export function destroySession(id: string | undefined): void {
   if (!id) return;
-  const session = sessions.get(id);
-  session?.client.close();
   sessions.delete(id);
 }

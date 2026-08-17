@@ -1,7 +1,13 @@
 import { EventEmitter } from "node:events";
 import WebSocket from "ws";
 
-const DERIV_WS_URL = "wss://ws.derivws.com/websockets/v3";
+// Deriv's public market-data WebSocket (quotes/ticks/contract metadata).
+// No app_id or auth needed -- confirmed directly against the live endpoint.
+// Account-scoped actions (trades, balances) aren't available on this
+// channel; those go through the REST API + OAuth2 flow instead (see
+// src/app.ts), which issues a short-lived, single-use OTP'd WebSocket URL
+// per connection rather than a long-lived authorized socket.
+const DERIV_WS_PUBLIC_URL = "wss://api.derivws.com/trading/v1/options/ws/public";
 const PING_INTERVAL_MS = 30_000;
 
 type PendingRequest = {
@@ -10,12 +16,11 @@ type PendingRequest = {
 };
 
 /**
- * Thin wrapper around Deriv's WebSocket API.
+ * Thin wrapper around Deriv's public WebSocket API.
  * Matches requests to responses via req_id, and re-emits streamed
- * messages (ticks, ohlc, balance, ...) as events for subscribers.
+ * messages (ticks, ohlc, ...) as events for subscribers.
  */
 export class DerivClient extends EventEmitter {
-  private appId: string;
   private wsUrl: string;
   private ws: WebSocket | null = null;
   private nextReqId = 1;
@@ -24,15 +29,14 @@ export class DerivClient extends EventEmitter {
 
   // wsUrl is overridable so tests can point this at a local mock server
   // instead of Deriv's real API.
-  constructor(appId: string, wsUrl: string = DERIV_WS_URL) {
+  constructor(wsUrl: string = DERIV_WS_PUBLIC_URL) {
     super();
-    this.appId = appId;
     this.wsUrl = wsUrl;
   }
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`${this.wsUrl}?app_id=${this.appId}`);
+      const ws = new WebSocket(this.wsUrl);
       this.ws = ws;
 
       ws.once("open", () => {
@@ -50,10 +54,10 @@ export class DerivClient extends EventEmitter {
           if (msg.error) rej(msg.error);
           else res(msg);
         }
-        // Streamed messages (tick, ohlc, balance, ...) carry a `msg_type`
-        // and keep arriving after the initial subscribe response. Error
-        // responses also carry the requested msg_type but no payload, so
-        // route those separately instead of emitting a malformed event.
+        // Streamed messages (tick, ohlc, ...) carry a `msg_type` and keep
+        // arriving after the initial subscribe response. Error responses
+        // also carry the requested msg_type but no payload, so route those
+        // separately instead of emitting a malformed event.
         if (msg.error) this.emit("api_error", msg.error);
         else if (msg.msg_type) this.emit(msg.msg_type, msg);
       });
@@ -75,10 +79,6 @@ export class DerivClient extends EventEmitter {
       this.pending.set(req_id, { resolve, reject });
       this.ws!.send(JSON.stringify(body));
     });
-  }
-
-  authorize(token: string) {
-    return this.send({ authorize: token });
   }
 
   subscribeTicks(symbol: string) {
