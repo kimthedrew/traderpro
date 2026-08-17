@@ -6,36 +6,6 @@
   </head>
   <body>
     <p id="status">Connecting your Deriv account&hellip;</p>
-    <script>
-      // Deriv appends acct1/token1/cur1 (and acct2/token2/... for every
-      // account on the login, e.g. demo + real) as query params here. We
-      // keep only the first account and hand its token straight to the
-      // backend -- it's exchanged for an httpOnly session cookie there and
-      // never touches localStorage or any other browser-readable storage.
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get("token1");
-
-      async function connect() {
-        if (!token) {
-          window.location.replace("/");
-          return;
-        }
-        try {
-          const res = await fetch("/api/session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token }),
-          });
-          if (!res.ok) throw new Error("Session exchange failed");
-        } catch {
-          document.getElementById("status").textContent =
-            "Couldn't connect your Deriv account. Redirecting you back...";
-        } finally {
-          window.location.replace("/");
-        }
-      }
-
-      connect();
-    </script>
+    <script src="redirect.js"></script>
   </body>
 </html>
