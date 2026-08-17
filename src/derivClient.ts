@@ -16,19 +16,23 @@ type PendingRequest = {
  */
 export class DerivClient extends EventEmitter {
   private appId: string;
+  private wsUrl: string;
   private ws: WebSocket | null = null;
   private nextReqId = 1;
   private pending = new Map<number, PendingRequest>();
   private pingTimer: NodeJS.Timeout | null = null;
 
-  constructor(appId: string) {
+  // wsUrl is overridable so tests can point this at a local mock server
+  // instead of Deriv's real API.
+  constructor(appId: string, wsUrl: string = DERIV_WS_URL) {
     super();
     this.appId = appId;
+    this.wsUrl = wsUrl;
   }
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`${DERIV_WS_URL}?app_id=${this.appId}`);
+      const ws = new WebSocket(`${this.wsUrl}?app_id=${this.appId}`);
       this.ws = ws;
 
       ws.once("open", () => {
