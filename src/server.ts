@@ -20,7 +20,9 @@ async function startDerivFeed() {
 
   deriv.on("disconnected", () => {
     console.warn("Deriv WebSocket disconnected, retrying in 3s...");
-    setTimeout(startDerivFeed, 3000);
+    setTimeout(() => {
+      startDerivFeed().catch((err) => console.error("Failed to reconnect to Deriv API:", err));
+    }, 3000);
   });
 
   await deriv.connect();

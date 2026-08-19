@@ -108,6 +108,30 @@ function applyAuthState() {
   });
 }
 
+// If redirect.js bounced back with ?login_error=..., show what went wrong
+// instead of silently landing on the logged-out homepage.
+const LOGIN_ERROR_MESSAGES = {
+  token_exchange: "Deriv rejected the login request while exchanging the authorization code.",
+  account_fetch: "Logged in, but couldn't fetch your Deriv account.",
+  state_mismatch: "Login could not be verified (state mismatch) -- please try again.",
+  session_exchange: "Couldn't complete the login with our server.",
+  network: "Network error while completing login.",
+  unexpected: "Unexpected error completing login.",
+  access_denied: "Login was cancelled.",
+};
+
+const loginErrorCode = new URLSearchParams(window.location.search).get("login_error");
+if (loginErrorCode) {
+  const banner = document.getElementById("login-error-banner");
+  const text = document.getElementById("login-error-text");
+  text.textContent = LOGIN_ERROR_MESSAGES[loginErrorCode] ?? `Login failed (${loginErrorCode}).`;
+  banner.hidden = false;
+  document.getElementById("login-error-dismiss").addEventListener("click", () => { banner.hidden = true; });
+  const url = new URL(window.location.href);
+  url.searchParams.delete("login_error");
+  history.replaceState(null, "", url);
+}
+
 Promise.all([
   fetch("/api/config").then((r) => r.json()),
   fetch("/api/session").then((r) => r.json()),

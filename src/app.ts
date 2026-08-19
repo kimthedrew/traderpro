@@ -73,13 +73,23 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
         redirect_uri: REDIRECT_URI,
       }),
     });
-    if (!tokenRes.ok) throw new Error(`Token exchange failed: HTTP ${tokenRes.status}`);
+    if (!tokenRes.ok) {
+      const body = await tokenRes.text();
+      console.error(`Deriv token exchange failed: HTTP ${tokenRes.status}`, body);
+      res.status(401).json({ error: "Could not complete Deriv login", stage: "token_exchange", status: tokenRes.status });
+      return;
+    }
     const { access_token: accessToken } = await tokenRes.json();
 
     const accountsRes = await fetch(`${DERIV_API_BASE}/trading/v1/options/accounts`, {
       headers: { "Deriv-App-ID": APP_ID, Authorization: `Bearer ${accessToken}` },
     });
-    if (!accountsRes.ok) throw new Error(`Fetching accounts failed: HTTP ${accountsRes.status}`);
+    if (!accountsRes.ok) {
+      const body = await accountsRes.text();
+      console.error(`Deriv account fetch failed: HTTP ${accountsRes.status}`, body);
+      res.status(401).json({ error: "Could not fetch your Deriv account", stage: "account_fetch", status: accountsRes.status });
+      return;
+    }
     const { data: accounts } = await accountsRes.json();
     const account = accounts?.[0] ?? {};
     // Exact field names aren't confirmed against a real login yet -- fall
@@ -96,8 +106,8 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
     });
     res.json({ loginid, currency });
   } catch (err) {
-    console.error("Deriv OAuth login failed:", err);
-    res.status(401).json({ error: "Could not complete Deriv login" });
+    console.error("Deriv OAuth login failed unexpectedly:", err);
+    res.status(502).json({ error: "Unexpected error talking to Deriv", stage: "unexpected" });
   }
 });
 
