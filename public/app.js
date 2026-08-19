@@ -47,6 +47,52 @@ stream.addEventListener("tick", (event) => {
   updateTicker(symbol, quote);
 });
 
+// Live signals: server-detected price-move alerts, delivered over the same
+// SSE connection as ticks (no login/account required to watch).
+const MAX_SIGNALS_SHOWN = 20;
+const signalsList = document.getElementById("signals-list");
+const signalsEmpty = document.getElementById("signals-empty");
+
+function formatSignalTime(isoOrEpochMs) {
+  const date = typeof isoOrEpochMs === "string" ? new Date(isoOrEpochMs) : new Date(isoOrEpochMs);
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function buildSignalItem(signal, timeSource) {
+  const el = document.createElement("div");
+  el.className = "signal-item";
+  const up = signal.direction === "up";
+  const changePct = signal.changePct ?? signal.change_pct;
+  el.innerHTML = `
+    <span class="signal-dir ${up ? "up" : "down"}">${up ? "▲" : "▼"}</span>
+    <span class="signal-symbol">${SYMBOL_NAMES[signal.symbol] ?? signal.symbol}</span>
+    <span class="signal-change ${up ? "up" : "down"}">${up ? "+" : ""}${changePct.toFixed(2)}%</span>
+    <span class="signal-price">${signal.price.toFixed(2)}</span>
+    <span class="signal-time">${formatSignalTime(timeSource)}</span>
+  `;
+  return el;
+}
+
+function prependSignal(signal, timeSource) {
+  signalsEmpty.remove();
+  signalsList.prepend(buildSignalItem(signal, timeSource));
+  while (signalsList.children.length > MAX_SIGNALS_SHOWN) {
+    signalsList.lastElementChild.remove();
+  }
+}
+
+fetch("/api/signals")
+  .then((r) => r.json())
+  .then(({ signals }) => {
+    if (!signals?.length) return;
+    signalsEmpty.remove();
+    signals.forEach((signal) => signalsList.append(buildSignalItem(signal, signal.createdAt)));
+  });
+
+stream.addEventListener("signal", (event) => {
+  prependSignal(JSON.parse(event.data), Date.now());
+});
+
 // OAuth2 + PKCE login. redirect.js exchanges the authorization code Deriv
 // hands back for an httpOnly session cookie server-side -- the browser
 // never sees the access token, so login state here comes from asking the

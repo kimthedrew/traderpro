@@ -1,17 +1,29 @@
 import "dotenv/config";
 import { app, broadcast } from "./app.js";
 import { DerivClient } from "./derivClient.js";
+import { SignalDetector } from "./signals.js";
+import { recordSignal } from "./signalsStore.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
 // Public tick data -- no auth or app_id needed. Symbols shown in the homepage ticker tape.
 const TICKER_SYMBOLS = ["R_100", "R_75", "R_50", "BOOM1000", "CRASH500", "JD100"];
 
+// Module-scoped (not per-connection) so signal history/cooldowns survive
+// the feed reconnecting -- a network blip shouldn't reset them.
+const signalDetector = new SignalDetector();
+
 async function startDerivFeed() {
   const deriv = new DerivClient();
 
   deriv.on("tick", (msg) => {
     broadcast("tick", { symbol: msg.tick.symbol, quote: msg.tick.quote, epoch: msg.tick.epoch });
+
+    const signal = signalDetector.check(msg.tick.symbol, msg.tick.quote, msg.tick.epoch);
+    if (signal) {
+      broadcast("signal", signal);
+      recordSignal(signal).catch((err) => console.error("Could not persist signal (database unavailable?):", err));
+    }
   });
 
   deriv.on("api_error", (err) => {

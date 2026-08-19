@@ -35,6 +35,18 @@ async function runMigrations() {
       expires_at TIMESTAMPTZ NOT NULL
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS signals (
+      id BIGSERIAL PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      change_pct DOUBLE PRECISION NOT NULL,
+      price DOUBLE PRECISION NOT NULL,
+      window_seconds INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS signals_created_at_idx ON signals (created_at DESC)`);
 }
 
 // Runs once per process on first import. Fine at this schema size (two

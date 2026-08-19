@@ -103,17 +103,28 @@ code changes. Deliberately kept undecided for now: `src/db.ts` runs its
 migration on boot but **won't take the server down** if the database is
 unreachable or `DATABASE_URL` is unset — the ticker and static pages keep
 working either way, and login/session endpoints degrade to reporting
-"logged out" instead of crashing. Schema is currently just `users` +
-`sessions`; there's no migration *tool* yet (just idempotent
-`CREATE TABLE IF NOT EXISTS` on boot) since two tables doesn't warrant
-one — revisit once Signals/Copy Trading need more tables.
+"logged out" instead of crashing. Schema is currently `users`, `sessions`,
+and `signals`; there's no migration *tool* yet (just idempotent
+`CREATE TABLE IF NOT EXISTS` on boot) since three tables doesn't warrant
+one — revisit once Copy Trading needs more.
+
+## Signals
+
+`src/signals.ts` watches the same tick stream the ticker uses and fires
+an event when a symbol moves ≥1% within a 5-minute rolling window (10min
+per-symbol cooldown so one big move doesn't spam repeatedly while still
+in progress — see the comment there for the exact numbers, chosen as a
+starting point rather than anything tuned against real volatility yet).
+Signals are persisted (`src/signalsStore.ts`) and broadcast live over the
+same SSE connection as ticks (`event: signal`) — `GET /api/signals`
+serves the last 20 for a page's initial load. No login or account access
+needed to watch; delivery is in-app only for now (no email/webhook yet).
 
 ## Next steps (not built yet)
 
 - Pick a Postgres provider for real deployments (currently undecided —
   works locally via Docker in the meantime).
-- Signals: pick a strategy trigger, push it to subscribers (email/push/
-  webhook) — no live account access required for this piece.
+- Signals: delivery channels beyond the in-app feed (email, webhook).
 - Copy trading: listen for a "leader" account's transaction stream and
   replicate trades onto follower accounts' authorized connections, with
   per-follower risk limits.

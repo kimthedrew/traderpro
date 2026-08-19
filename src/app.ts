@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createSession, destroySession, getSession } from "./sessionStore.js";
+import { getRecentSignals } from "./signalsStore.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -135,6 +136,18 @@ app.delete("/api/session", async (req, res) => {
   }
   res.clearCookie(SESSION_COOKIE);
   res.json({ loggedIn: false });
+});
+
+// History for the live signals feed's initial page load; new ones arrive
+// over the same SSE stream as ticks (event: "signal").
+app.get("/api/signals", async (_req, res) => {
+  try {
+    const signals = await getRecentSignals(20);
+    res.json({ signals });
+  } catch (err) {
+    console.error("Could not fetch signals (database unavailable?):", err);
+    res.json({ signals: [] });
+  }
 });
 
 // Relays live ticks from our backend Deriv WebSocket connection to the
