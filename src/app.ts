@@ -79,7 +79,7 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
       res.status(401).json({ error: "Could not complete Deriv login", stage: "token_exchange", status: tokenRes.status });
       return;
     }
-    const { access_token: accessToken } = await tokenRes.json();
+    const { access_token: accessToken, expires_in: expiresIn } = await tokenRes.json();
 
     const accountsRes = await fetch(`${DERIV_API_BASE}/trading/v1/options/accounts`, {
       headers: { "Deriv-App-ID": APP_ID, Authorization: `Bearer ${accessToken}` },
@@ -97,7 +97,9 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
     const loginid = account.loginid ?? account.login_id ?? account.id ?? "account";
     const currency = account.currency ?? "";
 
-    const sessionId = createSession({ loginid, currency, accessToken });
+    // Deriv's docs show a 3600s (1h) access token lifetime; fall back to
+    // that if expires_in is ever missing from the response.
+    const sessionId = await createSession({ loginid, currency, accessToken, expiresInSeconds: expiresIn ?? 3600 });
     res.cookie(SESSION_COOKIE, sessionId, {
       httpOnly: true,
       sameSite: "lax",
@@ -111,17 +113,26 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
   }
 });
 
-app.get("/api/session", (req, res) => {
-  const session = getSession(req.cookies?.[SESSION_COOKIE]);
-  if (!session) {
+app.get("/api/session", async (req, res) => {
+  try {
+    const session = await getSession(req.cookies?.[SESSION_COOKIE]);
+    if (!session) {
+      res.json({ loggedIn: false });
+      return;
+    }
+    res.json({ loggedIn: true, loginid: session.loginid, currency: session.currency });
+  } catch (err) {
+    console.error("Could not look up session (database unavailable?):", err);
     res.json({ loggedIn: false });
-    return;
   }
-  res.json({ loggedIn: true, loginid: session.loginid, currency: session.currency });
 });
 
-app.delete("/api/session", (req, res) => {
-  destroySession(req.cookies?.[SESSION_COOKIE]);
+app.delete("/api/session", async (req, res) => {
+  try {
+    await destroySession(req.cookies?.[SESSION_COOKIE]);
+  } catch (err) {
+    console.error("Could not destroy session server-side (database unavailable?):", err);
+  }
   res.clearCookie(SESSION_COOKIE);
   res.json({ loggedIn: false });
 });
