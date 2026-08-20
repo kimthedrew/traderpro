@@ -104,9 +104,9 @@ migration on boot but **won't take the server down** if the database is
 unreachable or `DATABASE_URL` is unset — the ticker and static pages keep
 working either way, and login/session endpoints degrade to reporting
 "logged out" instead of crashing. Schema is currently `users`, `sessions`,
-and `signals`; there's no migration *tool* yet (just idempotent
-`CREATE TABLE IF NOT EXISTS` on boot) since three tables doesn't warrant
-one — revisit once Copy Trading needs more.
+`signals`, `followers`, and `copy_trade_shadow_log`; there's no migration
+*tool* yet (just idempotent `CREATE TABLE IF NOT EXISTS` on boot) since
+this doesn't warrant one yet.
 
 ## Signals
 
@@ -120,13 +120,37 @@ same SSE connection as ticks (`event: signal`) — `GET /api/signals`
 serves the last 20 for a page's initial load. No login or account access
 needed to watch; delivery is in-app only for now (no email/webhook yet).
 
+## Copy Trading
+
+**Shadow mode only — no real trade is ever placed.** `src/copyTrading.ts`
+computes what a follower's copied trade *would* look like (leader's stake
+× the follower's `stakeRatio`, capped at their optional `maxStake`); it
+never calls Deriv's trade-execution API. Any logged-in user can configure
+following + risk limits (`POST /api/copy-trading/follow`) and see their
+shadow copy history (`GET /api/copy-trading/shadow-log`).
+
+What's *not* built yet: actually detecting a leader account's trades.
+Deriv's authenticated real-time model (OTP'd WebSocket per connection,
+`POST /trading/v1/options/accounts/{accountId}/otp`) isn't confirmed
+against real trade/transaction event shapes — same kind of gap the
+`ws_public` tick format was before it got verified. `COPY_TRADING_LEADER_LOGINID`
+identifies which account to watch once that's wired up; until then the
+feature has no leader, but everything else (follower config, shadow-copy
+math, the log) is real and tested.
+
+Going from shadow mode to actually placing trades is a deliberate,
+separate step — not something to flip on casually. Do the legal/compliance
+work (see Next steps) before that switch gets thrown.
+
 ## Next steps (not built yet)
 
 - Pick a Postgres provider for real deployments (currently undecided —
   works locally via Docker in the meantime).
 - Signals: delivery channels beyond the in-app feed (email, webhook).
-- Copy trading: listen for a "leader" account's transaction stream and
-  replicate trades onto follower accounts' authorized connections, with
-  per-follower risk limits.
+- Copy trading: wire up real leader trade detection (needs Deriv's
+  authenticated WS event shapes confirmed), and — only after legal
+  groundwork — an explicit, separate step to actually place trades
+  instead of shadow-logging them.
 - Legal: risk disclaimers, ToS, and a jurisdiction-specific compliance
-  check before charging anyone money for signals/copy trading.
+  check before charging anyone money for signals/copy trading, and
+  specifically before Copy Trading goes from shadow mode to live.

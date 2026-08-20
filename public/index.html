@@ -67,6 +67,44 @@
       </div>
     </section>
 
+    <section class="copy-trading">
+      <div class="container">
+        <p class="section-label">Preview &mdash; shadow mode</p>
+        <h2>Copy Trading</h2>
+        <p class="copy-trading-sub">See what would be copied to your account from the leader &mdash; no real trade is placed yet.</p>
+
+        <div class="ct-card" id="ct-logged-out">
+          <p>Log in with Deriv to configure copy trading.</p>
+        </div>
+
+        <div class="ct-card" id="ct-logged-in" hidden>
+          <form class="ct-form" id="ct-form">
+            <label class="ct-toggle">
+              <input type="checkbox" id="ct-enabled" />
+              <span>Follow the leader account</span>
+            </label>
+            <div class="ct-fields">
+              <label>Stake ratio
+                <input type="number" id="ct-stake-ratio" min="0.01" step="0.01" value="1" />
+              </label>
+              <label>Max stake <span class="ct-optional">(optional)</span>
+                <input type="number" id="ct-max-stake" min="0" step="0.01" placeholder="No cap" />
+              </label>
+              <button type="submit" class="btn btn-solid">Save</button>
+            </div>
+            <p class="ct-status" id="ct-save-status"></p>
+          </form>
+
+          <div class="ct-shadow-log">
+            <h3>Your shadow copy log</h3>
+            <div id="ct-shadow-list">
+              <p class="ct-status" id="ct-shadow-empty">Nothing copied yet.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="trust">
       <div class="container trust-grid">
         <div class="trust-item">

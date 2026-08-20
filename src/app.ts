@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createSession, destroySession, getSession } from "./sessionStore.js";
 import { getRecentSignals } from "./signalsStore.js";
+import { getFollower, getShadowLog, upsertFollower } from "./copyTradingStore.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +29,12 @@ if (!APP_ID) {
       "Register an app at https://developers.deriv.com and set DERIV_APP_ID to its App ID.",
   );
 }
+
+// Copy Trading v1 shadow-mode: whichever single account's trades get
+// watched (once that detection is wired up -- see README Copy Trading).
+// Unset means the feature has no leader yet; followers can still configure
+// their settings, there's just nothing to copy from.
+const LEADER_LOGINID = process.env.COPY_TRADING_LEADER_LOGINID ?? "";
 
 // Login attempts hit Deriv's own API per try, so a stricter limit than most
 // routes -- generous enough for someone with a few real accounts, tight
@@ -147,6 +154,74 @@ app.get("/api/signals", async (_req, res) => {
   } catch (err) {
     console.error("Could not fetch signals (database unavailable?):", err);
     res.json({ signals: [] });
+  }
+});
+
+async function currentLoginId(req: express.Request): Promise<string | null> {
+  const session = await getSession(req.cookies?.[SESSION_COOKIE]);
+  return session?.loginid ?? null;
+}
+
+// Copy Trading v1: shadow-mode only -- see src/copyTrading.ts. These
+// endpoints manage a follower's own settings and let them see what would
+// have been copied; nothing here ever places a real trade.
+app.get("/api/copy-trading/status", async (req, res) => {
+  try {
+    const loginid = await currentLoginId(req);
+    if (!loginid) {
+      res.json({ loggedIn: false, leaderConfigured: Boolean(LEADER_LOGINID) });
+      return;
+    }
+    const follower = await getFollower(loginid);
+    res.json({
+      loggedIn: true,
+      leaderConfigured: Boolean(LEADER_LOGINID),
+      enabled: follower?.enabled ?? false,
+      stakeRatio: follower?.stakeRatio ?? 1,
+      maxStake: follower?.maxStake ?? null,
+    });
+  } catch (err) {
+    console.error("Could not fetch copy-trading status (database unavailable?):", err);
+    res.json({ loggedIn: false, leaderConfigured: Boolean(LEADER_LOGINID) });
+  }
+});
+
+app.post("/api/copy-trading/follow", async (req, res) => {
+  const loginid = await currentLoginId(req).catch(() => null);
+  if (!loginid) {
+    res.status(401).json({ error: "Not logged in" });
+    return;
+  }
+  const { enabled, stakeRatio, maxStake } = req.body ?? {};
+  if (typeof enabled !== "boolean" || typeof stakeRatio !== "number" || !(stakeRatio > 0)) {
+    res.status(400).json({ error: "Invalid follower config" });
+    return;
+  }
+  if (maxStake !== null && typeof maxStake !== "number") {
+    res.status(400).json({ error: "Invalid follower config" });
+    return;
+  }
+  try {
+    await upsertFollower(loginid, { enabled, stakeRatio, maxStake: maxStake ?? null });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Could not save follower config (database unavailable?):", err);
+    res.status(502).json({ error: "Could not save settings" });
+  }
+});
+
+app.get("/api/copy-trading/shadow-log", async (req, res) => {
+  try {
+    const loginid = await currentLoginId(req);
+    if (!loginid) {
+      res.json({ entries: [] });
+      return;
+    }
+    const entries = await getShadowLog(loginid, 20);
+    res.json({ entries });
+  } catch (err) {
+    console.error("Could not fetch shadow log (database unavailable?):", err);
+    res.json({ entries: [] });
   }
 });
 

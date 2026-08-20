@@ -192,6 +192,68 @@ Promise.all([
   applyAuthState();
 });
 
+// Copy Trading (shadow mode): shows a follower's own settings + what would
+// have been copied, without ever placing a real trade.
+const ctLoggedOut = document.getElementById("ct-logged-out");
+const ctLoggedIn = document.getElementById("ct-logged-in");
+const ctForm = document.getElementById("ct-form");
+const ctEnabled = document.getElementById("ct-enabled");
+const ctStakeRatio = document.getElementById("ct-stake-ratio");
+const ctMaxStake = document.getElementById("ct-max-stake");
+const ctSaveStatus = document.getElementById("ct-save-status");
+const ctShadowList = document.getElementById("ct-shadow-list");
+const ctShadowEmpty = document.getElementById("ct-shadow-empty");
+
+function buildShadowItem(entry) {
+  const el = document.createElement("div");
+  el.className = "shadow-item";
+  const time = new Date(entry.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  el.innerHTML = `
+    <span class="shadow-symbol">${SYMBOL_NAMES[entry.symbol] ?? entry.symbol}</span>
+    <span class="shadow-leader-stake">leader: $${entry.leaderStake.toFixed(2)}</span>
+    <span class="shadow-stake">you: $${entry.wouldBeStake.toFixed(2)}</span>
+    <span class="shadow-time">${time}</span>
+  `;
+  return el;
+}
+
+async function loadShadowLog() {
+  const { entries } = await fetch("/api/copy-trading/shadow-log").then((r) => r.json());
+  if (!entries?.length) return;
+  ctShadowEmpty.remove();
+  entries.forEach((entry) => ctShadowList.append(buildShadowItem(entry)));
+}
+
+async function loadCopyTradingStatus() {
+  const status = await fetch("/api/copy-trading/status").then((r) => r.json());
+  ctLoggedOut.hidden = status.loggedIn;
+  ctLoggedIn.hidden = !status.loggedIn;
+  if (!status.loggedIn) return;
+
+  ctEnabled.checked = status.enabled;
+  ctStakeRatio.value = status.stakeRatio;
+  ctMaxStake.value = status.maxStake ?? "";
+  loadShadowLog();
+}
+
+ctForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  ctSaveStatus.textContent = "Saving...";
+  const maxStakeRaw = ctMaxStake.value.trim();
+  const res = await fetch("/api/copy-trading/follow", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      enabled: ctEnabled.checked,
+      stakeRatio: Number(ctStakeRatio.value),
+      maxStake: maxStakeRaw === "" ? null : Number(maxStakeRaw),
+    }),
+  });
+  ctSaveStatus.textContent = res.ok ? "Saved." : "Couldn't save your settings -- try again.";
+});
+
+loadCopyTradingStatus();
+
 // 3D tilt on the hero logo, following the cursor. Only on devices with a real
 // mouse -- touch screens get the CSS-only float/glow animation instead.
 const heroVisual = document.getElementById("hero-visual");

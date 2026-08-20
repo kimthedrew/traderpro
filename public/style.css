@@ -282,6 +282,67 @@ nav .container {
   .signal-time { width: 100%; order: 10; }
 }
 
+/* ---- copy trading ---- */
+.copy-trading { padding: 1rem 0 1rem; }
+.copy-trading .section-label { margin-bottom: 0.4rem; }
+.copy-trading h2 { text-align: center; font-size: 1.6rem; margin: 0 0 0.5rem; }
+.copy-trading-sub { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin: 0 0 1.75rem; }
+
+.ct-card {
+  max-width: 640px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.4rem 1.5rem;
+}
+
+#ct-logged-out p { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+
+.ct-toggle { display: flex; align-items: center; gap: 0.6rem; font-weight: 600; font-size: 0.95rem; margin-bottom: 1rem; cursor: pointer; }
+.ct-toggle input { width: 1.1rem; height: 1.1rem; accent-color: var(--accent); }
+
+.ct-fields { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
+.ct-fields label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.8rem; color: var(--text-muted); }
+.ct-optional { font-weight: 400; }
+
+.ct-fields input[type="number"] {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.9rem;
+  width: 8rem;
+  font-family: inherit;
+}
+
+.ct-fields .btn { align-self: flex-end; }
+
+.ct-status { font-size: 0.8rem; color: var(--text-muted); margin: 0.75rem 0 0; min-height: 1.1em; }
+
+.ct-shadow-log { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.ct-shadow-log h3 { font-size: 0.9rem; margin: 0 0 0.75rem; }
+
+.shadow-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.shadow-item:last-child { border-bottom: none; }
+.shadow-item .shadow-symbol { font-weight: 600; flex: 1; }
+.shadow-item .shadow-stake { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; }
+.shadow-item .shadow-leader-stake { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.shadow-item .shadow-time { color: var(--text-muted); font-size: 0.78rem; }
+
+@media (max-width: 600px) {
+  .ct-fields { flex-direction: column; align-items: stretch; }
+  .ct-fields .btn { align-self: stretch; }
+}
+
 /* ---- trust strip ---- */
 .trust { padding: 3.5rem 0; }
 .trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }

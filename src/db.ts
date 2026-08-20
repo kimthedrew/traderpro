@@ -47,6 +47,33 @@ async function runMigrations() {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS signals_created_at_idx ON signals (created_at DESC)`);
+
+  // Copy Trading v1 is shadow-mode only: we log what *would* be copied for
+  // each follower, never place a real trade. See README Copy Trading.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS followers (
+      loginid TEXT PRIMARY KEY REFERENCES users(loginid) ON DELETE CASCADE,
+      enabled BOOLEAN NOT NULL DEFAULT false,
+      stake_ratio DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+      max_stake DOUBLE PRECISION,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS copy_trade_shadow_log (
+      id BIGSERIAL PRIMARY KEY,
+      follower_loginid TEXT NOT NULL REFERENCES users(loginid) ON DELETE CASCADE,
+      leader_trade_ref TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      leader_stake DOUBLE PRECISION NOT NULL,
+      would_be_stake DOUBLE PRECISION NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS shadow_log_follower_created_idx ON copy_trade_shadow_log (follower_loginid, created_at DESC)`,
+  );
 }
 
 // Runs once per process on first import. Fine at this schema size (two
