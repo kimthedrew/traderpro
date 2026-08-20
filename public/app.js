@@ -93,66 +93,13 @@ stream.addEventListener("signal", (event) => {
   prependSignal(JSON.parse(event.data), Date.now());
 });
 
-// OAuth2 + PKCE login. redirect.js exchanges the authorization code Deriv
-// hands back for an httpOnly session cookie server-side -- the browser
-// never sees the access token, so login state here comes from asking the
-// backend, not reading storage.
+// OAuth2 + PKCE login (implementation shared with other pages via auth.js).
+// redirect.js exchanges the authorization code Deriv hands back for an
+// httpOnly session cookie server-side -- the browser never sees the access
+// token, so login state here comes from asking the backend, not storage.
 const navLoginBtn = document.getElementById("nav-login-btn");
 const navGetStartedBtn = document.getElementById("nav-get-started-btn");
 const heroLoginBtn = document.getElementById("hero-login-btn");
-const allAuthButtons = [navLoginBtn, navGetStartedBtn, heroLoginBtn];
-
-let oauthConfig = null;
-let loggedIn = false;
-
-// PKCE (Proof Key for Code Exchange): a random verifier + its SHA-256 hash,
-// generated fresh per login attempt. Deriv checks the hash matches when the
-// backend exchanges the code, so an intercepted code alone is useless.
-function randomPkceString(byteLength) {
-  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-  return Array.from(bytes, (b) => chars[b % chars.length]).join("");
-}
-
-function base64UrlEncode(buffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-async function goToLogin() {
-  if (!oauthConfig) return;
-  const codeVerifier = randomPkceString(64);
-  const codeChallenge = base64UrlEncode(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(codeVerifier)));
-  const state = randomPkceString(32);
-
-  sessionStorage.setItem("pkce_code_verifier", codeVerifier);
-  sessionStorage.setItem("oauth_state", state);
-
-  const url = new URL(oauthConfig.authUrl);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", oauthConfig.clientId);
-  url.searchParams.set("redirect_uri", oauthConfig.redirectUri);
-  url.searchParams.set("scope", oauthConfig.scope);
-  url.searchParams.set("state", state);
-  url.searchParams.set("code_challenge", codeChallenge);
-  url.searchParams.set("code_challenge_method", "S256");
-  window.location.href = url.toString();
-}
-
-async function logOut() {
-  await fetch("/api/session", { method: "DELETE" });
-  window.location.reload();
-}
-
-function applyAuthState() {
-  allAuthButtons.forEach((btn) => {
-    btn.removeEventListener("click", goToLogin);
-    btn.removeEventListener("click", logOut);
-    btn.addEventListener("click", loggedIn ? logOut : goToLogin);
-  });
-}
 
 // If redirect.js bounced back with ?login_error=..., show what went wrong
 // instead of silently landing on the logged-out homepage.
@@ -178,18 +125,12 @@ if (loginErrorCode) {
   history.replaceState(null, "", url);
 }
 
-Promise.all([
-  fetch("/api/config").then((r) => r.json()),
-  fetch("/api/session").then((r) => r.json()),
-]).then(([config, session]) => {
-  oauthConfig = config;
-  loggedIn = session.loggedIn;
-  if (loggedIn) {
+initNavAuth([navLoginBtn, navGetStartedBtn, heroLoginBtn]).then((session) => {
+  if (session.loggedIn) {
     navLoginBtn.textContent = session.loginid;
     navGetStartedBtn.textContent = "Log Out";
     heroLoginBtn.textContent = "Log Out";
   }
-  applyAuthState();
 });
 
 // Copy Trading (shadow mode): shows a follower's own settings + what would

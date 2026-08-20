@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { createSession, destroySession, getSession } from "./sessionStore.js";
 import { getRecentSignals } from "./signalsStore.js";
 import { getFollower, getShadowLog, upsertFollower } from "./copyTradingStore.js";
+import { createBot, deleteBot, getBotsForOwner, getPaperTrades, updateBot } from "./botBuilderStore.js";
+import type { BotDirection } from "./botBuilder.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +37,11 @@ if (!APP_ID) {
 // Unset means the feature has no leader yet; followers can still configure
 // their settings, there's just nothing to copy from.
 const LEADER_LOGINID = process.env.COPY_TRADING_LEADER_LOGINID ?? "";
+
+// Matches server.ts's TICKER_SYMBOLS -- the only symbols Signals (and so
+// Bot Builder, which watches Signals) can ever fire for.
+const KNOWN_SYMBOLS = new Set(["R_100", "R_75", "R_50", "BOOM1000", "CRASH500", "JD100"]);
+const BOT_DIRECTIONS = new Set<BotDirection>(["up", "down", "any"]);
 
 // Login attempts hit Deriv's own API per try, so a stricter limit than most
 // routes -- generous enough for someone with a few real accounts, tight
@@ -222,6 +229,122 @@ app.get("/api/copy-trading/shadow-log", async (req, res) => {
   } catch (err) {
     console.error("Could not fetch shadow log (database unavailable?):", err);
     res.json({ entries: [] });
+  }
+});
+
+// Bot Builder v1: paper-mode only -- see src/botBuilder.ts. Bots are
+// full CRUD resources (unlike Copy Trading's one-row-per-user config), so
+// every mutating/reading endpoint scopes by the owner's loginid, enforced
+// in the store's queries themselves, not just checked here beforehand.
+app.get("/api/bots", async (req, res) => {
+  try {
+    const loginid = await currentLoginId(req);
+    if (!loginid) {
+      res.json({ bots: [] });
+      return;
+    }
+    res.json({ bots: await getBotsForOwner(loginid) });
+  } catch (err) {
+    console.error("Could not fetch bots (database unavailable?):", err);
+    res.json({ bots: [] });
+  }
+});
+
+app.post("/api/bots", async (req, res) => {
+  const loginid = await currentLoginId(req).catch(() => null);
+  if (!loginid) {
+    res.status(401).json({ error: "Not logged in" });
+    return;
+  }
+  const { name, symbol, direction, stake } = req.body ?? {};
+  if (
+    typeof name !== "string" ||
+    !name.trim() ||
+    name.length > 60 ||
+    typeof symbol !== "string" ||
+    !KNOWN_SYMBOLS.has(symbol) ||
+    typeof direction !== "string" ||
+    !BOT_DIRECTIONS.has(direction as BotDirection) ||
+    typeof stake !== "number" ||
+    !(stake > 0)
+  ) {
+    res.status(400).json({ error: "Invalid bot config" });
+    return;
+  }
+  try {
+    const bot = await createBot(loginid, { name: name.trim(), symbol, direction: direction as BotDirection, stake });
+    res.json({ bot });
+  } catch (err) {
+    console.error("Could not create bot (database unavailable?):", err);
+    res.status(502).json({ error: "Could not create bot" });
+  }
+});
+
+app.patch("/api/bots/:id", async (req, res) => {
+  const loginid = await currentLoginId(req).catch(() => null);
+  if (!loginid) {
+    res.status(401).json({ error: "Not logged in" });
+    return;
+  }
+  const id = Number(req.params.id);
+  const { enabled, stake } = req.body ?? {};
+  if (!Number.isInteger(id) || typeof enabled !== "boolean" || typeof stake !== "number" || !(stake > 0)) {
+    res.status(400).json({ error: "Invalid bot update" });
+    return;
+  }
+  try {
+    const updated = await updateBot(id, loginid, { enabled, stake });
+    if (!updated) {
+      res.status(404).json({ error: "Bot not found" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Could not update bot (database unavailable?):", err);
+    res.status(502).json({ error: "Could not update bot" });
+  }
+});
+
+app.delete("/api/bots/:id", async (req, res) => {
+  const loginid = await currentLoginId(req).catch(() => null);
+  if (!loginid) {
+    res.status(401).json({ error: "Not logged in" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid bot id" });
+    return;
+  }
+  try {
+    const deleted = await deleteBot(id, loginid);
+    if (!deleted) {
+      res.status(404).json({ error: "Bot not found" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Could not delete bot (database unavailable?):", err);
+    res.status(502).json({ error: "Could not delete bot" });
+  }
+});
+
+app.get("/api/bots/:id/trades", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid bot id" });
+    return;
+  }
+  try {
+    const loginid = await currentLoginId(req);
+    if (!loginid) {
+      res.json({ trades: [] });
+      return;
+    }
+    res.json({ trades: await getPaperTrades(id, loginid, 20) });
+  } catch (err) {
+    console.error("Could not fetch paper trades (database unavailable?):", err);
+    res.json({ trades: [] });
   }
 });
 

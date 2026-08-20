@@ -3,6 +3,7 @@ import { app, broadcast } from "./app.js";
 import { DerivClient } from "./derivClient.js";
 import { SignalDetector } from "./signals.js";
 import { recordSignal } from "./signalsStore.js";
+import { runBotsForSignal } from "./botBuilderStore.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -23,6 +24,7 @@ async function startDerivFeed() {
     if (signal) {
       broadcast("signal", signal);
       recordSignal(signal).catch((err) => console.error("Could not persist signal (database unavailable?):", err));
+      runBotsForSignal(signal).catch((err) => console.error("Could not evaluate bots for signal (database unavailable?):", err));
     }
   });
 

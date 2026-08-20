@@ -397,6 +397,9 @@ nav .container {
 
 .feature-card p { color: var(--text-muted); font-size: 0.88rem; line-height: 1.55; margin: 0; }
 
+.feature-card-link { display: inline-block; margin-top: 0.7rem; font-size: 0.85rem; font-weight: 600; color: var(--accent); text-decoration: none; }
+.feature-card-link:hover { text-decoration: underline; }
+
 /* ---- disclaimer footer ---- */
 footer { border-top: 1px solid var(--border); padding: 1.75rem 0 2.5rem; }
 

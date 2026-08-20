@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0d12" />
+    <title>Bot Builder — traderpro</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="bots.css" />
+  </head>
+  <body>
+    <nav>
+      <div class="container">
+        <a class="brand" href="/">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M4 25 L13 15.5 L18.5 21 L27 8" fill="none" stroke="#5b8def" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M20 8 H27 V15" fill="none" stroke="#5b8def" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>
+            <span class="brand-text">traderpro</span>
+            <span class="brand-sub">powered by Deriv</span>
+          </span>
+        </a>
+        <div class="nav-actions">
+          <button class="btn btn-outline" id="nav-login-btn" type="button">Log In</button>
+          <a class="btn btn-solid" href="/">Back home</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container bots-page">
+      <p class="section-label">Preview &mdash; paper mode</p>
+      <h1>Bot Builder</h1>
+      <p class="bots-sub">Build a simple rule that watches Signals and paper-trades against them. <strong>No real trade is ever placed by this feature yet</strong> — see the Terms of Service.</p>
+
+      <div class="ct-card" id="bots-logged-out">
+        <p>Log in with Deriv to build bots.</p>
+      </div>
+
+      <div id="bots-logged-in" hidden>
+        <div class="ct-card">
+          <h2 class="bots-form-title">New bot</h2>
+          <form class="bot-form" id="bot-form">
+            <label>Name
+              <input type="text" id="bot-name" maxlength="60" placeholder="e.g. R_100 dip buyer" required />
+            </label>
+            <label>Symbol
+              <select id="bot-symbol"></select>
+            </label>
+            <label>Trigger direction
+              <select id="bot-direction">
+                <option value="any">Any</option>
+                <option value="up">Up only</option>
+                <option value="down">Down only</option>
+              </select>
+            </label>
+            <label>Stake ($)
+              <input type="number" id="bot-stake" min="0.01" step="0.01" value="10" required />
+            </label>
+            <button type="submit" class="btn btn-solid">Create bot</button>
+          </form>
+          <p class="ct-status" id="bot-create-status"></p>
+        </div>
+
+        <div id="bots-list"></div>
+        <p class="ct-status" id="bots-empty">No bots yet — create one above.</p>
+      </div>
+    </main>
+
+    <footer>
+      <div class="container">
+        <div class="disclaimer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L14.7 3.86a2 2 0 00-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <p><strong>Risk disclaimer.</strong> Deriv offers complex derivatives, such as options and contracts for difference ("CFDs"). These products may not be suitable for all clients, and trading them puts you at risk. You may lose some or all of the money you invest in a trade. Never trade with money you cannot afford to lose. Bot Builder is currently in paper mode — no real trades are executed by bots yet.</p>
+        </div>
+        <div class="footer-links">
+          <a href="/terms.html">Terms of Service</a>
+          <span aria-hidden="true">&middot;</span>
+          <a href="/privacy.html">Privacy Policy</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="auth.js"></script>
+    <script src="bots.js"></script>
+  </body>
+</html>

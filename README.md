@@ -1,8 +1,8 @@
 # traderpro
 
-Deriv third-party trading app. Scaffold stage: live market-data feed +
-Deriv OAuth2 login. Planned build order: **signals &rarr; copy trading &rarr;
-no-code bot builder**.
+Deriv third-party trading app. Live market-data feed, Deriv OAuth2 login,
+Signals (live), and Copy Trading + Bot Builder (both real, both
+deliberately shadow/paper-mode-only — see their sections below for why).
 
 Deriv migrated their API in 2026 to a REST + OAuth2/PKCE model (from the
 older single-WebSocket, `?app_id=` query-param API many older examples
@@ -25,8 +25,14 @@ still reference). This project is built against the current API.
 - `src/sessionStore.ts` &mdash; session store backed by Postgres (`users` +
   `sessions` tables), keyed by an httpOnly cookie; holds each logged-in
   user's OAuth2 access token server-side.
-- `public/` &mdash; static frontend: live tick display, and a "Log in with
-  Deriv" button that runs the OAuth2 + PKCE flow.
+- `src/signals.ts` / `src/copyTrading.ts` / `src/botBuilder.ts` &mdash; pure,
+  unit-tested logic for each feature (detection, shadow-copy math, bot
+  matching), separate from their `*Store.ts` counterparts which do the
+  actual Postgres reads/writes.
+- `public/` &mdash; static frontend. `index.html` (ticker, Signals, Copy
+  Trading) and `bots.html` (Bot Builder) share `style.css` and
+  `auth.js` (OAuth2 + PKCE login/logout, kept in one place since it's
+  security-sensitive code two drifting copies would be bad news for).
 
 ## Setup
 
@@ -142,6 +148,28 @@ Going from shadow mode to actually placing trades is a deliberate,
 separate step — not something to flip on casually. Do the legal/compliance
 work (see Next steps) before that switch gets thrown.
 
+## Bot Builder
+
+**Paper mode only — no real trade is ever placed.** The third and last
+roadmap item, and the riskiest one if it were live: a bot is a no-code
+rule ("when a Signal fires for [symbol] in [direction], paper-trade
+[$stake]") that reuses Signal detection rather than a second condition
+engine (`src/botBuilder.ts`). Unlike Copy Trading's one-row-per-user
+config, bots are full CRUD resources — any logged-in user can create,
+enable/disable, edit the stake on, or delete multiple bots
+(`/api/bots`, own page at `/bots.html`), and every mutating/reading
+endpoint scopes by owner in the query itself (`WHERE ... AND
+owner_loginid = $2`), not just a check beforehand, so one user can't
+touch another's bot by guessing its id.
+
+There's deliberately no path from paper mode to live trading yet, unlike
+Copy Trading which at least has `COPY_TRADING_LEADER_LOGINID` wired up
+for when detection is ready. A bot placing real, unsupervised trades from
+an arbitrary user-defined rule is a materially bigger risk than mirroring
+a single known leader's activity — that switch needs its own explicit
+design discussion, not just a config flag, whenever it's actually on the
+table.
+
 ## Legal
 
 `public/terms.html` and `public/privacy.html` are a technically-informed
@@ -171,6 +199,9 @@ itself. Before relying on them:
   instead of shadow-logging them.
 - Legal: get the draft ToS/privacy policy in front of real counsel (see
   Legal above) before charging anyone money, and specifically before
-  Copy Trading goes from shadow mode to live.
+  Copy Trading or Bot Builder go from shadow/paper mode to live.
+- Bot Builder: real trade execution is intentionally undesigned — needs
+  its own explicit design pass (not just a flag) once legal groundwork
+  and Copy Trading's live-detection piece are both further along.
 - Confirm the `/accounts` response field names (see OAuth2 + PKCE flow
   above) against a real login.

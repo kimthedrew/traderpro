@@ -74,6 +74,37 @@ async function runMigrations() {
   await pool.query(
     `CREATE INDEX IF NOT EXISTS shadow_log_follower_created_idx ON copy_trade_shadow_log (follower_loginid, created_at DESC)`,
   );
+
+  // Bot Builder v1 is paper-mode only, same reasoning as Copy Trading's
+  // shadow mode -- see README Bot Builder. A bot is a rule that watches
+  // Signals (reusing that detection rather than a second condition
+  // engine) and logs what it would have traded, never a real order.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bots (
+      id BIGSERIAL PRIMARY KEY,
+      owner_loginid TEXT NOT NULL REFERENCES users(loginid) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL DEFAULT 'any',
+      stake DOUBLE PRECISION NOT NULL,
+      enabled BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS bots_owner_idx ON bots (owner_loginid)`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bot_paper_trades (
+      id BIGSERIAL PRIMARY KEY,
+      bot_id BIGINT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      stake DOUBLE PRECISION NOT NULL,
+      price DOUBLE PRECISION NOT NULL,
+      signal_change_pct DOUBLE PRECISION NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS bot_paper_trades_bot_created_idx ON bot_paper_trades (bot_id, created_at DESC)`);
 }
 
 // Runs once per process on first import. Fine at this schema size (two
