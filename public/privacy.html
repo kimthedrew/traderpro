@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0d12" />
+    <title>Privacy Policy — traderpro</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="legal.css" />
+  </head>
+  <body>
+    <nav>
+      <div class="container">
+        <a class="brand" href="/">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M4 25 L13 15.5 L18.5 21 L27 8" fill="none" stroke="#5b8def" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M20 8 H27 V15" fill="none" stroke="#5b8def" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>
+            <span class="brand-text">traderpro</span>
+            <span class="brand-sub">powered by Deriv</span>
+          </span>
+        </a>
+      </div>
+    </nav>
+
+    <main class="legal container">
+      <div class="legal-draft-banner">
+        <strong>Draft — not yet reviewed by a lawyer.</strong> This describes what the code
+        actually does today, as accurately as we can state it, but hasn't been reviewed for legal
+        completeness (e.g. GDPR/CCPA-style rights language) by qualified counsel yet.
+      </div>
+
+      <h1>Privacy Policy</h1>
+      <p class="legal-meta">Draft — no effective date yet.</p>
+
+      <h2>1. What we collect</h2>
+      <ul>
+        <li>Your Deriv account ID (<code>loginid</code>) and currency, once you log in.</li>
+        <li>An OAuth2 access token for your Deriv account, used server-side only — it never
+          reaches your browser.</li>
+        <li>If you configure Copy Trading: your stake ratio, optional max stake, and a log of
+          what would have been copied to your account (see Copy Trading — currently shadow mode
+          only, nothing here reflects real trades).</li>
+        <li>Standard web server request logs (e.g. IP address), used only for rate-limiting abuse
+          and debugging — not analytics.</li>
+      </ul>
+
+      <h2>2. What we don't collect</h2>
+      <p>We never see or store your Deriv password. We don't request more account permissions
+      (OAuth scopes) than the app currently uses. We don't run any analytics or advertising
+      trackers. We don't collect payment card details — traderpro doesn't process payments.</p>
+
+      <h2>3. How we use it</h2>
+      <p>To keep you logged in (a session cookie identifies your session; the underlying account
+      data lives server-side), to show your account info in the interface, and — if you use Copy
+      Trading — to compute and display your shadow-copy log.</p>
+
+      <h2>4. Data retention</h2>
+      <p>Sessions currently last up to 24 hours or until you log out, whichever comes first.
+      Logging out clears your session on traderpro's side, but does not revoke the underlying
+      Deriv authorization — revoke that separately from your Deriv account settings if you want to
+      fully disconnect. <em>[Retention periods and a deletion-request process to be finalized.]</em></p>
+
+      <h2>5. Third parties</h2>
+      <p>Deriv, as the account/OAuth provider — necessary for the app to function. A database
+      hosting provider (chosen separately — see the project's README) stores account and session
+      data. No data is sold or shared for advertising.</p>
+
+      <h2>6. Cookies</h2>
+      <p>One httpOnly session cookie, used solely to keep you logged in. No marketing or
+      cross-site tracking cookies.</p>
+
+      <h2>7. Security</h2>
+      <p>Traffic is served over HTTPS. Your Deriv access token is never sent to your browser.
+      Login attempts are rate-limited. See the project's public source code for the actual
+      implementation.</p>
+
+      <h2>8. Your rights</h2>
+      <p><em>[To be finalized with counsel — e.g. access/deletion request process, and any
+      jurisdiction-specific rights such as GDPR or CCPA that may apply depending on where users
+      are located.]</em></p>
+
+      <h2>9. Changes to this policy</h2>
+      <p>If what data we collect or how we use it changes, this page will be updated.</p>
+
+      <h2>10. Contact</h2>
+      <p><em>[Contact email/address to be added.]</em></p>
+    </main>
+
+    <footer>
+      <div class="container">
+        <div class="disclaimer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L14.7 3.86a2 2 0 00-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <p><strong>Risk disclaimer.</strong> Deriv offers complex derivatives, such as options and contracts for difference ("CFDs"). These products may not be suitable for all clients, and trading them puts you at risk. You may lose some or all of the money you invest in a trade. Never trade with money you cannot afford to lose.</p>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -72,7 +72,7 @@ nav .container {
   padding-block: 0.9rem;
 }
 
-.brand { display: flex; align-items: center; gap: 0.55rem; }
+.brand { display: flex; align-items: center; gap: 0.55rem; text-decoration: none; }
 .brand svg { width: 1.5rem; height: 1.5rem; }
 .brand-text { font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; }
 .brand-sub { font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: -2px; }
@@ -413,6 +413,16 @@ footer { border-top: 1px solid var(--border); padding: 1.75rem 0 2.5rem; }
 .disclaimer svg { width: 1rem; height: 1rem; flex: none; margin-top: 0.15rem; color: var(--text-muted); }
 .disclaimer strong { color: var(--text); }
 .disclaimer p { margin: 0; }
+
+.footer-links {
+  text-align: center;
+  margin-top: 1.25rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.footer-links a { color: var(--text-muted); text-decoration: none; }
+.footer-links a:hover { color: var(--text); text-decoration: underline; }
+.footer-links span { margin: 0 0.5rem; }
 
 @media (max-width: 760px) {
   .trust-grid, .feature-grid { grid-template-columns: 1fr; }

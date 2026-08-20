@@ -142,6 +142,24 @@ Going from shadow mode to actually placing trades is a deliberate,
 separate step — not something to flip on casually. Do the legal/compliance
 work (see Next steps) before that switch gets thrown.
 
+## Legal
+
+`public/terms.html` and `public/privacy.html` are a technically-informed
+first draft — accurately describing what the app actually does today —
+**not reviewed by a lawyer yet**. Both are marked as drafts on the page
+itself. Before relying on them:
+
+- Real counsel review, specifically for: jurisdictions where users will
+  actually be (this determines a lot — GDPR/CCPA-style rights language,
+  financial-promotion rules for Signals, and whether Copy Trading counts
+  as regulated investment advice/portfolio management in a given
+  jurisdiction even in shadow mode, and especially once live).
+- A real contact address/email (both docs have a placeholder).
+- Governing law and limitation-of-liability language (both explicitly
+  stubbed out, `[in brackets]`, in `terms.html`).
+- Confirming Deriv's own terms don't conflict with or already cover
+  something traderpro's terms currently duplicate or contradict.
+
 ## Next steps (not built yet)
 
 - Pick a Postgres provider for real deployments (currently undecided —
@@ -151,6 +169,8 @@ work (see Next steps) before that switch gets thrown.
   authenticated WS event shapes confirmed), and — only after legal
   groundwork — an explicit, separate step to actually place trades
   instead of shadow-logging them.
-- Legal: risk disclaimers, ToS, and a jurisdiction-specific compliance
-  check before charging anyone money for signals/copy trading, and
-  specifically before Copy Trading goes from shadow mode to live.
+- Legal: get the draft ToS/privacy policy in front of real counsel (see
+  Legal above) before charging anyone money, and specifically before
+  Copy Trading goes from shadow mode to live.
+- Confirm the `/accounts` response field names (see OAuth2 + PKCE flow
+  above) against a real login.

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0d12" />
+    <title>Terms of Service — traderpro</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="legal.css" />
+  </head>
+  <body>
+    <nav>
+      <div class="container">
+        <a class="brand" href="/">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M4 25 L13 15.5 L18.5 21 L27 8" fill="none" stroke="#5b8def" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M20 8 H27 V15" fill="none" stroke="#5b8def" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>
+            <span class="brand-text">traderpro</span>
+            <span class="brand-sub">powered by Deriv</span>
+          </span>
+        </a>
+      </div>
+    </nav>
+
+    <main class="legal container">
+      <div class="legal-draft-banner">
+        <strong>Draft — not yet reviewed by a lawyer.</strong> This is a technically-informed starting
+        point, not finished legal advice. It should not be relied on or presented to users as final
+        until reviewed by qualified counsel for the jurisdictions traderpro actually operates in.
+      </div>
+
+      <h1>Terms of Service</h1>
+      <p class="legal-meta">Draft — no effective date yet.</p>
+
+      <h2>1. What traderpro is</h2>
+      <p>traderpro is a third-party application that connects to your own Deriv account via
+      Deriv's OAuth2 login. traderpro is not Deriv, is not affiliated with or endorsed by Deriv,
+      and does not hold, custody, or have direct access to your funds. All trades execute on the
+      Deriv account you already control and have authorized.</p>
+
+      <h2>2. Eligibility</h2>
+      <p>You must have your own Deriv account in good standing, and be legally permitted to trade
+      the products Deriv offers in your jurisdiction. It is your responsibility to know and follow
+      the laws that apply to you. <em>[Jurisdiction-specific eligibility restrictions to be added
+      after legal review.]</em></p>
+
+      <h2>3. Non-custodial access</h2>
+      <p>traderpro connects to your Deriv account through Deriv's own OAuth2 authorization flow.
+      You explicitly grant traderpro a limited set of permissions (currently: trading operations
+      and account management) each time you log in. You can revoke this access at any time from
+      your Deriv account's own settings. traderpro never sees or stores your Deriv password.</p>
+
+      <h2>4. Signals</h2>
+      <p>Signals are automated alerts generated from public market data using a simple, published
+      trigger (see the Signals section on the homepage for the current rule). Signals are
+      informational only. They are <strong>not</strong> financial advice, a recommendation to trade,
+      or a guarantee of any outcome. Past signal activity is not indicative of future results. You
+      are solely responsible for any trading decisions you make.</p>
+
+      <h2>5. Copy Trading — currently shadow mode only</h2>
+      <p><strong>As of this draft, Copy Trading does not place real trades.</strong> It computes and
+      logs what a trade copied from a configured leader account would have looked like for your
+      account, based on the stake ratio and optional maximum stake you set. Nothing executes
+      against your real Deriv account through this feature at this time.</p>
+      <p>If and when live trade execution is introduced, it will require a separate, explicit
+      opt-in, additional terms specific to that risk, and will not be silently enabled for
+      existing shadow-mode users. When that happens: copy trading, like all trading, carries risk
+      of loss; a leader's past performance does not predict future results; and traderpro is not
+      responsible for losses arising from copied trades.</p>
+
+      <h2>6. No guarantee of profit</h2>
+      <p>Trading derivatives, including the synthetic indices and options Deriv offers, carries a
+      high risk of loss. Nothing in traderpro — signals, copy trading, or any future feature —
+      guarantees profit or protects against loss. Never trade with money you cannot afford to
+      lose.</p>
+
+      <h2>7. Account security</h2>
+      <p>You are responsible for keeping your Deriv account credentials secure. traderpro uses an
+      httpOnly session cookie to keep you logged in to traderpro itself; if you use a shared or
+      public device, log out when you're done.</p>
+
+      <h2>8. Limitation of liability</h2>
+      <p><em>[Standard limitation-of-liability language to be drafted with counsel, appropriate to
+      the jurisdictions traderpro operates in.]</em></p>
+
+      <h2>9. Changes to these terms</h2>
+      <p>These terms may change as traderpro's features change — notably, if Copy Trading moves
+      from shadow mode to live execution. Material changes will be reflected here with an updated
+      effective date.</p>
+
+      <h2>10. Governing law</h2>
+      <p><em>[To be determined with counsel, based on where traderpro is operated from and where
+      its users are located.]</em></p>
+
+      <h2>11. Contact</h2>
+      <p><em>[Contact email/address to be added.]</em></p>
+    </main>
+
+    <footer>
+      <div class="container">
+        <div class="disclaimer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L14.7 3.86a2 2 0 00-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <p><strong>Risk disclaimer.</strong> Deriv offers complex derivatives, such as options and contracts for difference ("CFDs"). These products may not be suitable for all clients, and trading them puts you at risk. You may lose some or all of the money you invest in a trade. Never trade with money you cannot afford to lose.</p>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
