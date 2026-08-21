@@ -4,11 +4,9 @@ import { DerivClient } from "./derivClient.js";
 import { SignalDetector } from "./signals.js";
 import { recordSignal } from "./signalsStore.js";
 import { runBotsForSignal } from "./botBuilderStore.js";
+import { TICKER_SYMBOLS } from "./symbols.js";
 
 const PORT = Number(process.env.PORT ?? 3000);
-
-// Public tick data -- no auth or app_id needed. Symbols shown in the homepage ticker tape.
-const TICKER_SYMBOLS = ["R_100", "R_75", "R_50", "BOOM1000", "CRASH500", "JD100"];
 
 // Module-scoped (not per-connection) so signal history/cooldowns survive
 // the feed reconnecting -- a network blip shouldn't reset them.

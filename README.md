@@ -29,9 +29,13 @@ still reference). This project is built against the current API.
   unit-tested logic for each feature (detection, shadow-copy math, bot
   matching), separate from their `*Store.ts` counterparts which do the
   actual Postgres reads/writes.
+- `src/symbols.ts` / `public/symbols.js` &mdash; the one place the tradeable
+  symbol list (`R_100`, `R_75`, ...) is defined, for backend and frontend
+  respectively. `server.ts`, `app.ts`, `app.js`, and `bots.js` all import
+  from these instead of each keeping their own hand-synced copy.
 - `public/` &mdash; static frontend. `index.html` (ticker, Signals, Copy
-  Trading) and `bots.html` (Bot Builder) share `style.css` and
-  `auth.js` (OAuth2 + PKCE login/logout, kept in one place since it's
+  Trading) and `bots.html` (Bot Builder) share `style.css`, `symbols.js`,
+  and `auth.js` (OAuth2 + PKCE login/logout, kept in one place since it's
   security-sensitive code two drifting copies would be bad news for).
 
 ## Setup
@@ -87,7 +91,13 @@ still reference). This project is built against the current API.
    never reaches browser JS.
 6. `GET /api/session` / `DELETE /api/session` cover login-state checks and
    logout. Sessions live in Postgres now (see Persistence below), so they
-   survive a restart or crash.
+   survive a restart or crash. The session cookie's lifetime matches the
+   real session's expiry exactly (Deriv's `expires_in`, ~1h) rather than a
+   separate fixed value — it used to be a flat 24h cookie regardless of
+   how long the underlying session actually stayed valid for, so people
+   could hold a cookie that looked fine for up to 23 hours after the
+   server had already started rejecting it and silently reporting them as
+   logged out.
 
 Note: the exact field names in the `/accounts` response (`loginid` vs
 `login_id` vs `id`) haven't been confirmed against a real login yet —
@@ -114,6 +124,52 @@ working either way, and login/session endpoints degrade to reporting
 *tool* yet (just idempotent `CREATE TABLE IF NOT EXISTS` on boot) since
 this doesn't warrant one yet.
 
+## Reliability
+
+A recurring bug class this project has hit more than once: an unhandled
+error on something long-lived (a WebSocket, a stream, a connection pool)
+crashes the *entire* Node process, not just the one thing that broke —
+taking every connected user down over one bad message or one dropped
+connection. Fixed instances of this, all verified directly rather than
+assumed fixed after the code looked right:
+
+- **`src/db.ts`**: the Postgres pool had no `connectionTimeoutMillis`
+  (pg's default is 0 — wait forever), and migrations run behind a
+  blocking top-level `await`. A `DATABASE_URL` pointing at a host that
+  hangs instead of actively refusing (firewalled, paused, wrong
+  hostname) would block server startup forever — not just the database,
+  the *entire app*, including the public ticker. Fixed with a 5s
+  timeout; verified by pointing `DATABASE_URL` at a non-routable IP and
+  confirming the server now starts within ~9s instead of hanging.
+- **`src/app.ts`**: `broadcast()` wrote to every SSE client with no error
+  handling — a half-closed connection whose `close` event hadn't fired
+  yet could crash the process for every connected user. Now wraps
+  `write()` in try/catch and listens for `error` on each connection.
+- **`src/derivClient.ts`**: `JSON.parse` on incoming WebSocket messages
+  had no try/catch — one malformed frame from Deriv would take down the
+  ticker/Signals/Bot Builder for everyone. Now logs and ignores a
+  malformed frame instead; verified against a mock server that sends one
+  deliberately, confirming the client stays functional afterward.
+- **`src/app.ts`**: the four mutating routes (`POST /api/copy-trading/follow`,
+  `POST /api/bots`, `PATCH /api/bots/:id`, `DELETE /api/bots/:id`) used
+  to swallow database errors and report a plain `401 Not logged in` —
+  identical to what a genuinely missing session cookie produces. A
+  database outage would misreport a real, logged-in user as logged out.
+  `requireLogin()` now distinguishes "no cookie" (401 is correct) from
+  "the database errored out while checking" (502, with a clear message);
+  verified by stopping the local Postgres mid-request and confirming a
+  502 instead of a 401, then confirming normal 401s resume once it's
+  back.
+- **`src/app.ts`**: added `app.set("trust proxy", 1)` for Render's
+  reverse proxy. Worth a correction here: this was originally flagged as
+  breaking every login behind a proxy (express-rate-limit's default
+  config validates the `trust proxy` setting and throws if it looks
+  misconfigured). Direct testing showed the library actually catches
+  that validation error internally and only logs it — it never fails
+  the request. So this was never actually broken; the fix is still
+  correct practice (accurate `req.ip`, no console noise), just not the
+  severity first claimed.
+
 ## Signals
 
 `src/signals.ts` watches the same tick stream the ticker uses and fires
@@ -125,6 +181,13 @@ Signals are persisted (`src/signalsStore.ts`) and broadcast live over the
 same SSE connection as ticks (`event: signal`) — `GET /api/signals`
 serves the last 20 for a page's initial load. No login or account access
 needed to watch; delivery is in-app only for now (no email/webhook yet).
+
+The initial history fetch and the live SSE listener both start around
+page load and can race — a signal firing in that window could arrive via
+both paths. `public/app.js` dedups by a content key (symbol + direction +
+changePct + price; a symbol's 10-minute cooldown makes two *real* signals
+colliding on all four values essentially impossible) rather than plumbing
+a database id through the broadcast-before-insert live path.
 
 ## Copy Trading
 
@@ -160,7 +223,11 @@ enable/disable, edit the stake on, or delete multiple bots
 (`/api/bots`, own page at `/bots.html`), and every mutating/reading
 endpoint scopes by owner in the query itself (`WHERE ... AND
 owner_loginid = $2`), not just a check beforehand, so one user can't
-touch another's bot by guessing its id.
+touch another's bot by guessing its id. `PATCH /api/bots/:id` is a real
+partial update (send only the field you're changing) — it used to
+require and overwrite both `enabled` and `stake` together, so toggling a
+bot on/off from a page with a stale cached stake value could silently
+revert a stake edit made in another tab.
 
 There's deliberately no path from paper mode to live trading yet, unlike
 Copy Trading which at least has `COPY_TRADING_LEADER_LOGINID` wired up

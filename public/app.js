@@ -1,12 +1,4 @@
-const SYMBOL_NAMES = {
-  R_100: "Volatility 100",
-  R_75: "Volatility 75",
-  R_50: "Volatility 50",
-  BOOM1000: "Boom 1000",
-  CRASH500: "Crash 500",
-  JD100: "Jump 100",
-};
-
+// SYMBOL_NAMES comes from symbols.js, loaded before this script.
 const track = document.getElementById("ticker-track");
 const lastPrice = {}; // symbol -> last quote seen, for computing delta between ticks
 
@@ -54,8 +46,7 @@ const signalsList = document.getElementById("signals-list");
 const signalsEmpty = document.getElementById("signals-empty");
 
 function formatSignalTime(isoOrEpochMs) {
-  const date = typeof isoOrEpochMs === "string" ? new Date(isoOrEpochMs) : new Date(isoOrEpochMs);
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return new Date(isoOrEpochMs).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 function buildSignalItem(signal, timeSource) {
@@ -73,7 +64,21 @@ function buildSignalItem(signal, timeSource) {
   return el;
 }
 
+// The initial history fetch and the already-open SSE listener race: a
+// signal firing in that window can arrive via both paths. Dedup by a
+// content key (a symbol has a 10min cooldown, so two real signals with
+// identical symbol/direction/changePct/price in that span is not a
+// realistic collision) rather than plumbing a DB id through the
+// broadcast-before-insert live path.
+const seenSignalKeys = new Set();
+function signalKey(signal) {
+  return `${signal.symbol}|${signal.direction}|${signal.changePct}|${signal.price}`;
+}
+
 function prependSignal(signal, timeSource) {
+  const key = signalKey(signal);
+  if (seenSignalKeys.has(key)) return;
+  seenSignalKeys.add(key);
   signalsEmpty.remove();
   signalsList.prepend(buildSignalItem(signal, timeSource));
   while (signalsList.children.length > MAX_SIGNALS_SHOWN) {
@@ -86,7 +91,10 @@ fetch("/api/signals")
   .then(({ signals }) => {
     if (!signals?.length) return;
     signalsEmpty.remove();
-    signals.forEach((signal) => signalsList.append(buildSignalItem(signal, signal.createdAt)));
+    signals.forEach((signal) => {
+      seenSignalKeys.add(signalKey(signal));
+      signalsList.append(buildSignalItem(signal, signal.createdAt));
+    });
   });
 
 stream.addEventListener("signal", (event) => {

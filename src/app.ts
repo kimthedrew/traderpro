@@ -9,6 +9,7 @@ import { getRecentSignals } from "./signalsStore.js";
 import { getFollower, getShadowLog, upsertFollower } from "./copyTradingStore.js";
 import { createBot, deleteBot, getBotsForOwner, getPaperTrades, updateBot } from "./botBuilderStore.js";
 import type { BotDirection } from "./botBuilder.js";
+import { TICKER_SYMBOLS } from "./symbols.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,7 +18,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const APP_ID = process.env.DERIV_APP_ID ?? "";
 export const REDIRECT_URI = process.env.OAUTH_REDIRECT_URL ?? "http://localhost:3000/redirect.html";
 const SESSION_COOKIE = "traderpro_sid";
-const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const DERIV_AUTH_URL = "https://auth.deriv.com/oauth2/auth";
 const DERIV_TOKEN_URL = "https://auth.deriv.com/oauth2/token";
@@ -38,9 +38,9 @@ if (!APP_ID) {
 // their settings, there's just nothing to copy from.
 const LEADER_LOGINID = process.env.COPY_TRADING_LEADER_LOGINID ?? "";
 
-// Matches server.ts's TICKER_SYMBOLS -- the only symbols Signals (and so
-// Bot Builder, which watches Signals) can ever fire for.
-const KNOWN_SYMBOLS = new Set(["R_100", "R_75", "R_50", "BOOM1000", "CRASH500", "JD100"]);
+// The only symbols Signals (and so Bot Builder, which watches Signals)
+// can ever fire for -- same list server.ts subscribes ticks for.
+const KNOWN_SYMBOLS = new Set(TICKER_SYMBOLS);
 const BOT_DIRECTIONS = new Set<BotDirection>(["up", "down", "any"]);
 
 // Login attempts hit Deriv's own API per try, so a stricter limit than most
@@ -121,13 +121,19 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
     const currency = account.currency ?? "";
 
     // Deriv's docs show a 3600s (1h) access token lifetime; fall back to
-    // that if expires_in is ever missing from the response.
-    const sessionId = await createSession({ loginid, currency, accessToken, expiresInSeconds: expiresIn ?? 3600 });
+    // that if expires_in is ever missing from the response. The cookie's
+    // maxAge matches this exactly -- it used to be a fixed 24h regardless
+    // of the DB session's real expiry, so the browser would keep sending
+    // a cookie that looked valid for up to 23 hours after getSession()
+    // (which filters on expires_at) had already started silently
+    // rejecting it and reporting the user as logged out.
+    const sessionLifetimeSeconds = expiresIn ?? 3600;
+    const sessionId = await createSession({ loginid, currency, accessToken, expiresInSeconds: sessionLifetimeSeconds });
     res.cookie(SESSION_COOKIE, sessionId, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
-      maxAge: SESSION_MAX_AGE_MS,
+      maxAge: sessionLifetimeSeconds * 1000,
     });
     res.json({ loginid, currency });
   } catch (err) {
@@ -177,6 +183,33 @@ async function currentLoginId(req: express.Request): Promise<string | null> {
   return session?.loginid ?? null;
 }
 
+// For routes that require login (as opposed to the GET routes above, which
+// degrade to a logged-out-shaped response on any failure). Distinguishes
+// "no session cookie" (genuinely not logged in -- 401 is correct) from "the
+// database errored out while checking" (401 would misreport a real,
+// logged-in user as logged out mid-outage -- this reports it honestly as
+// a server error instead).
+async function requireLogin(req: express.Request, res: express.Response): Promise<string | null> {
+  const cookie = req.cookies?.[SESSION_COOKIE];
+  if (!cookie) {
+    res.status(401).json({ error: "Not logged in" });
+    return null;
+  }
+  let session;
+  try {
+    session = await getSession(cookie);
+  } catch (err) {
+    console.error("Could not verify session (database unavailable?):", err);
+    res.status(502).json({ error: "Could not verify your session -- try again" });
+    return null;
+  }
+  if (!session) {
+    res.status(401).json({ error: "Not logged in" });
+    return null;
+  }
+  return session.loginid;
+}
+
 // Copy Trading v1: shadow-mode only -- see src/copyTrading.ts. These
 // endpoints manage a follower's own settings and let them see what would
 // have been copied; nothing here ever places a real trade.
@@ -202,17 +235,14 @@ app.get("/api/copy-trading/status", async (req, res) => {
 });
 
 app.post("/api/copy-trading/follow", async (req, res) => {
-  const loginid = await currentLoginId(req).catch(() => null);
-  if (!loginid) {
-    res.status(401).json({ error: "Not logged in" });
-    return;
-  }
+  const loginid = await requireLogin(req, res);
+  if (!loginid) return;
   const { enabled, stakeRatio, maxStake } = req.body ?? {};
   if (typeof enabled !== "boolean" || typeof stakeRatio !== "number" || !(stakeRatio > 0)) {
     res.status(400).json({ error: "Invalid follower config" });
     return;
   }
-  if (maxStake !== null && typeof maxStake !== "number") {
+  if (maxStake !== null && (typeof maxStake !== "number" || maxStake < 0)) {
     res.status(400).json({ error: "Invalid follower config" });
     return;
   }
@@ -259,11 +289,8 @@ app.get("/api/bots", async (req, res) => {
 });
 
 app.post("/api/bots", async (req, res) => {
-  const loginid = await currentLoginId(req).catch(() => null);
-  if (!loginid) {
-    res.status(401).json({ error: "Not logged in" });
-    return;
-  }
+  const loginid = await requireLogin(req, res);
+  if (!loginid) return;
   const { name, symbol, direction, stake } = req.body ?? {};
   if (
     typeof name !== "string" ||
@@ -289,19 +316,25 @@ app.post("/api/bots", async (req, res) => {
 });
 
 app.patch("/api/bots/:id", async (req, res) => {
-  const loginid = await currentLoginId(req).catch(() => null);
-  if (!loginid) {
-    res.status(401).json({ error: "Not logged in" });
-    return;
-  }
+  const loginid = await requireLogin(req, res);
+  if (!loginid) return;
   const id = Number(req.params.id);
   const { enabled, stake } = req.body ?? {};
-  if (!Number.isInteger(id) || typeof enabled !== "boolean" || typeof stake !== "number" || !(stake > 0)) {
+  // Partial update -- a field that's omitted is left untouched. Sending
+  // both back unconditionally (the old behavior) meant toggling just
+  // "enabled" from a stale page could silently revert a stake edit made
+  // in another tab since the page loaded.
+  if (
+    !Number.isInteger(id) ||
+    (enabled === undefined && stake === undefined) ||
+    (enabled !== undefined && typeof enabled !== "boolean") ||
+    (stake !== undefined && (typeof stake !== "number" || !(stake > 0)))
+  ) {
     res.status(400).json({ error: "Invalid bot update" });
     return;
   }
   try {
-    const updated = await updateBot(id, loginid, { enabled, stake });
+    const updated = await updateBot(id, loginid, { enabled: enabled ?? null, stake: stake ?? null });
     if (!updated) {
       res.status(404).json({ error: "Bot not found" });
       return;
@@ -314,11 +347,8 @@ app.patch("/api/bots/:id", async (req, res) => {
 });
 
 app.delete("/api/bots/:id", async (req, res) => {
-  const loginid = await currentLoginId(req).catch(() => null);
-  if (!loginid) {
-    res.status(401).json({ error: "Not logged in" });
-    return;
-  }
+  const loginid = await requireLogin(req, res);
+  if (!loginid) return;
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "Invalid bot id" });

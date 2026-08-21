@@ -1,12 +1,4 @@
-const SYMBOL_NAMES = {
-  R_100: "Volatility 100",
-  R_75: "Volatility 75",
-  R_50: "Volatility 50",
-  BOOM1000: "Boom 1000",
-  CRASH500: "Crash 500",
-  JD100: "Jump 100",
-};
-
+// SYMBOL_NAMES comes from symbols.js, loaded before this script.
 const navLoginBtn = document.getElementById("nav-login-btn");
 const loggedOut = document.getElementById("bots-logged-out");
 const loggedIn = document.getElementById("bots-logged-in");
@@ -66,10 +58,12 @@ async function buildBotCard(bot) {
   `;
 
   el.querySelector(".bot-enabled-toggle").addEventListener("change", async (event) => {
+    // Only send the field actually changing -- the backend does a partial
+    // update now, so this can't clobber a stake edit made in another tab.
     await fetch(`/api/bots/${bot.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled: event.target.checked, stake: bot.stake }),
+      body: JSON.stringify({ enabled: event.target.checked }),
     });
   });
 

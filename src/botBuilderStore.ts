@@ -32,17 +32,20 @@ export async function getBotsForOwner(ownerLoginid: string): Promise<Bot[]> {
 // Every mutation is scoped to (id AND ownerLoginid) so one user can never
 // touch another's bot by guessing an id -- ownership is enforced in the
 // query itself, not just checked beforehand.
+//
+// Partial update: pass null for a field to leave it untouched (COALESCE
+// falls back to the existing value). Unconditionally overwriting both
+// fields together let toggling "enabled" from a stale page silently
+// revert a stake edit made elsewhere since the page loaded.
 export async function updateBot(
   id: number,
   ownerLoginid: string,
-  config: { enabled: boolean; stake: number },
+  config: { enabled: boolean | null; stake: number | null },
 ): Promise<boolean> {
-  const result = await pool.query(`UPDATE bots SET enabled = $1, stake = $2 WHERE id = $3 AND owner_loginid = $4`, [
-    config.enabled,
-    config.stake,
-    id,
-    ownerLoginid,
-  ]);
+  const result = await pool.query(
+    `UPDATE bots SET enabled = COALESCE($1, enabled), stake = COALESCE($2, stake) WHERE id = $3 AND owner_loginid = $4`,
+    [config.enabled, config.stake, id, ownerLoginid],
+  );
   return (result.rowCount ?? 0) > 0;
 }
 
