@@ -47,7 +47,17 @@ export class DerivClient extends EventEmitter {
       ws.once("error", (err) => reject(err));
 
       ws.on("message", (raw) => {
-        const msg = JSON.parse(raw.toString());
+        // A malformed/non-JSON frame throwing synchronously here would be
+        // an uncaught exception inside an EventEmitter callback -- it
+        // crashes the whole process, taking every user's tick/Signals/Bot
+        // Builder stream down over one bad message, not just this one.
+        let msg: any;
+        try {
+          msg = JSON.parse(raw.toString());
+        } catch (err) {
+          console.error("DerivClient: received a non-JSON message, ignoring:", err);
+          return;
+        }
         if (typeof msg.req_id === "number" && this.pending.has(msg.req_id)) {
           const { resolve: res, reject: rej } = this.pending.get(msg.req_id)!;
           this.pending.delete(msg.req_id);

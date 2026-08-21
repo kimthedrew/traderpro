@@ -9,7 +9,14 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// connectionTimeoutMillis: pg's default is 0 (wait forever). Without a
+// bound, a DATABASE_URL pointing at a host that hangs instead of actively
+// refusing (firewalled, paused, wrong hostname) would block the migration
+// query below forever -- and since that runs behind a top-level await,
+// the whole module graph (and so the server) never finishes loading,
+// exactly the "takes the whole server down" outcome the comment below
+// says this is supposed to avoid.
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 5000 });
 
 // A dropped idle-client connection emits 'error' on the pool; with no
 // listener, Node treats that as an uncaught exception and crashes the

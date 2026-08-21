@@ -49,6 +49,14 @@ const BOT_DIRECTIONS = new Set<BotDirection>(["up", "down", "any"]);
 const sessionLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false });
 
 export const app = express();
+// Render (and most PaaS/reverse-proxy setups) sits exactly one hop in
+// front of this app and sets X-Forwarded-For. Without this, Express's
+// default (don't trust any proxy) makes express-rate-limit's default
+// keyGenerator throw on every request that has that header -- see
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR. `1` (not `true`) trusts exactly one
+// hop rather than the whole chain, which the library explicitly warns
+// against as trivially spoofable.
+app.set("trust proxy", 1);
 app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
@@ -361,9 +369,24 @@ app.get("/api/stream", (req, res) => {
   res.flushHeaders();
   sseClients.add(res);
   req.on("close", () => sseClients.delete(res));
+  // An unhandled 'error' event on a stream is a crash in Node (same class
+  // of bug as the pg pool's 'error' listener above) -- a half-closed
+  // connection can emit one here before 'close' fires and removes it from
+  // sseClients, so this needs its own listener rather than relying on that.
+  res.on("error", (err) => {
+    console.error("SSE client connection error, dropping it:", err);
+    sseClients.delete(res);
+  });
 });
 
 export function broadcast(event: string, data: unknown) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const client of sseClients) client.write(payload);
+  for (const client of sseClients) {
+    try {
+      client.write(payload);
+    } catch (err) {
+      console.error("Could not write to an SSE client, dropping it:", err);
+      sseClients.delete(client);
+    }
+  }
 }
