@@ -2,14 +2,15 @@ import { pool } from "./db.js";
 import { matchesBot, buildPaperTrade, type Bot, type BotDirection, type PaperTrade } from "./botBuilder.js";
 import type { SignalEvent } from "./signals.js";
 
-// id comes back from Postgres as a string (BIGSERIAL/BIGINT columns are
-// returned as strings by pg, to avoid precision loss on values outside
-// JS's safe integer range) -- convert explicitly rather than let a wrong
-// type quietly ride along as "it happens to work in a URL param".
+// id comes back from Postgres/CockroachDB as a string (BIGSERIAL/BIGINT
+// columns are returned as strings by pg, to avoid precision loss on values
+// outside JS's safe integer range). Bot.id is typed as a string precisely
+// so this is a plain passthrough, not a conversion -- see the comment on
+// Bot.id in botBuilder.ts for why converting to Number is unsafe here.
 type BotRow = { id: string; owner_loginid: string; name: string; symbol: string; direction: BotDirection; stake: number; enabled: boolean };
 
 function rowToBot(r: BotRow): Bot {
-  return { id: Number(r.id), ownerLoginid: r.owner_loginid, name: r.name, symbol: r.symbol, direction: r.direction, stake: r.stake, enabled: r.enabled };
+  return { id: r.id, ownerLoginid: r.owner_loginid, name: r.name, symbol: r.symbol, direction: r.direction, stake: r.stake, enabled: r.enabled };
 }
 
 export async function createBot(ownerLoginid: string, config: { name: string; symbol: string; direction: BotDirection; stake: number }): Promise<Bot> {
@@ -38,7 +39,7 @@ export async function getBotsForOwner(ownerLoginid: string): Promise<Bot[]> {
 // fields together let toggling "enabled" from a stale page silently
 // revert a stake edit made elsewhere since the page loaded.
 export async function updateBot(
-  id: number,
+  id: string,
   ownerLoginid: string,
   config: { enabled: boolean | null; stake: number | null },
 ): Promise<boolean> {
@@ -49,7 +50,7 @@ export async function updateBot(
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function deleteBot(id: number, ownerLoginid: string): Promise<boolean> {
+export async function deleteBot(id: string, ownerLoginid: string): Promise<boolean> {
   const result = await pool.query(`DELETE FROM bots WHERE id = $1 AND owner_loginid = $2`, [id, ownerLoginid]);
   return (result.rowCount ?? 0) > 0;
 }
@@ -84,9 +85,9 @@ export type StoredPaperTrade = PaperTrade & { createdAt: string };
 
 // Ownership check via a join, not just trusting the caller's botId --
 // same reasoning as updateBot/deleteBot above.
-export async function getPaperTrades(botId: number, ownerLoginid: string, limit = 20): Promise<StoredPaperTrade[]> {
+export async function getPaperTrades(botId: string, ownerLoginid: string, limit = 20): Promise<StoredPaperTrade[]> {
   const result = await pool.query<{
-    bot_id: string; // see BotRow comment above -- pg returns bigint as string
+    bot_id: string; // see BotRow comment above -- pg/CockroachDB return bigint as string
     symbol: string;
     direction: "up" | "down";
     stake: number;
@@ -100,7 +101,7 @@ export async function getPaperTrades(botId: number, ownerLoginid: string, limit 
     [botId, ownerLoginid, limit],
   );
   return result.rows.map((r) => ({
-    botId: Number(r.bot_id),
+    botId: r.bot_id,
     symbol: r.symbol,
     direction: r.direction,
     stake: r.stake,

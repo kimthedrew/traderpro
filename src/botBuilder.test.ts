@@ -5,7 +5,7 @@ import { matchesBot, buildPaperTrade, type Bot } from "./botBuilder.js";
 const signal = { symbol: "R_100", direction: "up" as const, changePct: 1.5, price: 612.4, windowSeconds: 300 };
 
 function makeBot(overrides: Partial<Bot> = {}): Bot {
-  return { id: 1, ownerLoginid: "CR1", name: "Test bot", symbol: "R_100", direction: "any", stake: 10, enabled: true, ...overrides };
+  return { id: "1", ownerLoginid: "CR1", name: "Test bot", symbol: "R_100", direction: "any", stake: 10, enabled: true, ...overrides };
 }
 
 test("matches when symbol matches and direction is 'any'", () => {
@@ -29,13 +29,24 @@ test("does not match a disabled bot", () => {
 });
 
 test("buildPaperTrade carries the bot's stake and the signal's market data", () => {
-  const trade = buildPaperTrade(makeBot({ id: 42, stake: 25 }), signal);
+  const trade = buildPaperTrade(makeBot({ id: "42", stake: 25 }), signal);
   assert.deepEqual(trade, {
-    botId: 42,
+    botId: "42",
     symbol: "R_100",
     direction: "up",
     stake: 25,
     price: 612.4,
     signalChangePct: 1.5,
   });
+});
+
+// Regression test: bot ids used to be converted with Number(), which loses
+// precision on CockroachDB's default id generation (routinely > 2^53,
+// confirmed directly against a real cluster). botId must round-trip
+// exactly as a string, not silently become a different value.
+test("buildPaperTrade preserves a CockroachDB-scale id exactly, with no precision loss", () => {
+  const largeId = "1203769134487797761"; // exceeds Number.MAX_SAFE_INTEGER
+  const trade = buildPaperTrade(makeBot({ id: largeId }), signal);
+  assert.equal(trade.botId, largeId);
+  assert.equal(typeof trade.botId, "string");
 });

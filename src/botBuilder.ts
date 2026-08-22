@@ -8,7 +8,16 @@ import type { SignalEvent } from "./signals.js";
 export type BotDirection = "up" | "down" | "any";
 
 export type Bot = {
-  id: number;
+  // Kept as a string, not a number -- Postgres/CockroachDB BIGSERIAL/BIGINT
+  // ids come back from pg as strings to avoid precision loss on values
+  // outside JS's safe integer range. Regular Postgres sequences start
+  // small enough that converting to Number "happens to work" for a long
+  // time, but CockroachDB's default id generation (unique_rowid(), built
+  // from a timestamp + node component) routinely exceeds that range
+  // immediately -- confirmed directly: a real id round-tripped through
+  // Number() came back as a different value. Nothing here ever does math
+  // on an id, only equality/URL-building, so there's no reason to convert.
+  id: string;
   ownerLoginid: string;
   name: string;
   symbol: string;
@@ -18,7 +27,7 @@ export type Bot = {
 };
 
 export type PaperTrade = {
-  botId: number;
+  botId: string;
   symbol: string;
   direction: "up" | "down";
   stake: number;

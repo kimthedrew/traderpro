@@ -114,15 +114,39 @@ socket like the old API.
 ## Persistence
 
 `DATABASE_URL` is a plain Postgres connection string — works with Neon,
-Render Postgres, Supabase, a local instance, or anything else, with no
-code changes. Deliberately kept undecided for now: `src/db.ts` runs its
-migration on boot but **won't take the server down** if the database is
-unreachable or `DATABASE_URL` is unset — the ticker and static pages keep
-working either way, and login/session endpoints degrade to reporting
-"logged out" instead of crashing. Schema is currently `users`, `sessions`,
-`signals`, `followers`, and `copy_trade_shadow_log`; there's no migration
-*tool* yet (just idempotent `CREATE TABLE IF NOT EXISTS` on boot) since
-this doesn't warrant one yet.
+Render Postgres, Supabase, CockroachDB, a local instance, or anything
+else, with no code changes. `src/db.ts` runs its migration on boot but
+**won't take the server down** if the database is unreachable or
+`DATABASE_URL` is unset — the ticker and static pages keep working
+either way, and login/session endpoints degrade to reporting "logged
+out" instead of crashing. Schema is currently `users`, `sessions`,
+`signals`, `followers`, `copy_trade_shadow_log`, `bots`, and
+`bot_paper_trades`; there's no migration *tool* yet (just idempotent
+`CREATE TABLE IF NOT EXISTS` on boot) since this doesn't warrant one yet.
+
+**Confirmed against a real CockroachDB Cloud cluster** (Postgres-wire-
+compatible, works with `pg` and this same `DATABASE_URL` pattern — no
+code changes needed for connectivity, and no CA cert setup was needed
+either; Node already trusted its certificate chain). Migrations do take
+noticeably longer against it than plain Postgres (CockroachDB's DDL goes
+through distributed consensus per statement) — 11 sequential
+`CREATE TABLE`/`CREATE INDEX` calls at boot took long enough to be worth
+knowing about, though it stayed well within reason for a one-time
+startup cost.
+
+One real compatibility issue *was* found and fixed, not just worked
+around: CockroachDB's default id generation (`unique_rowid()`, built
+from a timestamp + node component) routinely produces values larger
+than `Number.MAX_SAFE_INTEGER` — confirmed directly, a real generated id
+came back different after a naive `Number()` conversion
+(`1203769134487797761` → `1203769134487797800`). `src/botBuilderStore.ts`
+used to do exactly that conversion (added earlier, for a *different* bug
+where Postgres returns `BIGSERIAL` columns as strings). Bot ids are now
+kept as strings everywhere — frontend and backend, request params and
+responses — since nothing ever does arithmetic on one, only equality and
+URL-building. Verified end-to-end against the real cluster: full bot
+create → paper-trade → update → delete lifecycle using its actual
+(large, string) generated ids.
 
 ## Reliability
 

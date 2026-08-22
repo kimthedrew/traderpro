@@ -42,6 +42,10 @@ const LEADER_LOGINID = process.env.COPY_TRADING_LEADER_LOGINID ?? "";
 // can ever fire for -- same list server.ts subscribes ticks for.
 const KNOWN_SYMBOLS = new Set(TICKER_SYMBOLS);
 const BOT_DIRECTIONS = new Set<BotDirection>(["up", "down", "any"]);
+// Bot ids are kept as strings throughout (see Bot.id in botBuilder.ts) --
+// this just rejects obviously-malformed input early with a clean 400,
+// it's not doing any numeric conversion.
+const BOT_ID_PATTERN = /^\d+$/;
 
 // Login attempts hit Deriv's own API per try, so a stricter limit than most
 // routes -- generous enough for someone with a few real accounts, tight
@@ -318,14 +322,14 @@ app.post("/api/bots", async (req, res) => {
 app.patch("/api/bots/:id", async (req, res) => {
   const loginid = await requireLogin(req, res);
   if (!loginid) return;
-  const id = Number(req.params.id);
+  const id = req.params.id;
   const { enabled, stake } = req.body ?? {};
   // Partial update -- a field that's omitted is left untouched. Sending
   // both back unconditionally (the old behavior) meant toggling just
   // "enabled" from a stale page could silently revert a stake edit made
   // in another tab since the page loaded.
   if (
-    !Number.isInteger(id) ||
+    !BOT_ID_PATTERN.test(id) ||
     (enabled === undefined && stake === undefined) ||
     (enabled !== undefined && typeof enabled !== "boolean") ||
     (stake !== undefined && (typeof stake !== "number" || !(stake > 0)))
@@ -349,8 +353,8 @@ app.patch("/api/bots/:id", async (req, res) => {
 app.delete("/api/bots/:id", async (req, res) => {
   const loginid = await requireLogin(req, res);
   if (!loginid) return;
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id)) {
+  const id = req.params.id;
+  if (!BOT_ID_PATTERN.test(id)) {
     res.status(400).json({ error: "Invalid bot id" });
     return;
   }
@@ -368,8 +372,8 @@ app.delete("/api/bots/:id", async (req, res) => {
 });
 
 app.get("/api/bots/:id/trades", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id)) {
+  const id = req.params.id;
+  if (!BOT_ID_PATTERN.test(id)) {
     res.status(400).json({ error: "Invalid bot id" });
     return;
   }
