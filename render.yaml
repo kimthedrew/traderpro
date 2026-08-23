@@ -8,7 +8,7 @@ services:
       - key: DERIV_APP_ID
         value: "33stOEdBBT6OJNq5sdS5f"
       - key: OAUTH_REDIRECT_URL
-        value: https://traderpro.onrender.com/redirect.html
+        value: https://traderpro-o4za.onrender.com/redirect.html
       # Pending on choosing a Postgres provider (Neon/Render/Supabase/etc) --
       # sync: false means Render won't manage this value; set it manually in
       # the dashboard once decided. Login/sessions degrade gracefully without
