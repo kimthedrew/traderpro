@@ -1,0 +1,100 @@
+.trade-page { max-width: 720px; padding-block: 2rem 4rem; }
+
+.trade-page h1 { font-size: 2rem; margin: 0 0 0.4rem; letter-spacing: -0.02em; }
+.trade-sub { color: var(--text-muted); line-height: 1.6; margin: 0 0 1.5rem; }
+
+.real-money-banner {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text);
+  margin-bottom: 1.75rem;
+}
+
+.real-money-banner svg { width: 1.15rem; height: 1.15rem; flex: none; margin-top: 0.1rem; color: var(--warn); }
+.real-money-banner strong { color: var(--warn); }
+
+#trade-unavailable p { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+#trade-logged-out p { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+
+.trade-chart-card { padding: 1.2rem 1.3rem; }
+
+.trade-chart-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+.trade-chart-header select {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+}
+
+#trade-chart { width: 100%; height: 200px; display: block; border-radius: 6px; background: var(--surface-raised); }
+.trade-chart-empty { text-align: center; color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem; }
+
+.trade-form-card { padding: 1.3rem 1.4rem; margin-top: 1rem; }
+
+.trade-direction-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+.trade-direction-btn {
+  flex: 1;
+  padding: 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.trade-direction-btn.selected.rise { border-color: var(--up); color: var(--up); background: color-mix(in srgb, var(--up) 14%, var(--surface-raised)); }
+.trade-direction-btn.selected.fall { border-color: var(--down); color: var(--down); background: color-mix(in srgb, var(--down) 14%, var(--surface-raised)); }
+
+.trade-fields { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.trade-fields label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.8rem; color: var(--text-muted); }
+
+.trade-fields input, .trade-fields select {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.9rem;
+  width: 8rem;
+  font-family: inherit;
+}
+
+.trade-proposal { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem 1rem; margin-bottom: 1rem; font-size: 0.88rem; }
+.trade-proposal-row { display: flex; justify-content: space-between; padding: 0.2rem 0; }
+.trade-proposal-row .label { color: var(--text-muted); }
+
+.trade-confirm { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.85rem; color: var(--text); margin-bottom: 1rem; cursor: pointer; }
+.trade-confirm input { width: 1.1rem; height: 1.1rem; accent-color: var(--warn); margin-top: 0.1rem; }
+
+.btn-warn { background: var(--warn); color: #1a1204; }
+.btn-warn:hover { filter: brightness(1.08); }
+.btn-warn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+
+.trade-list-card { margin-top: 1.5rem; }
+.trade-list-card h2 { font-size: 1rem; margin: 0 0 1rem; }
+
+.trade-item { display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; padding: 0.55rem 0; border-bottom: 1px solid var(--border); }
+.trade-item:last-child { border-bottom: none; }
+.trade-item .trade-dir.rise { color: var(--up); }
+.trade-item .trade-dir.fall { color: var(--down); }
+.trade-item .trade-symbol { font-weight: 600; flex: 1; }
+.trade-item .trade-status { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.trade-item .trade-status.error { color: var(--down); }
+.trade-item .trade-time { color: var(--text-muted); font-size: 0.78rem; }
+
+@media (max-width: 600px) {
+  .trade-fields { flex-direction: column; align-items: stretch; }
+  .trade-fields input, .trade-fields select { width: 100%; }
+}

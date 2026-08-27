@@ -43,7 +43,13 @@ async function connect() {
     window.location.replace("/?login_error=network");
     return;
   }
-  window.location.replace("/");
+
+  // Land on the Real Trading page post-login when it's enabled (the
+  // client's requested "logs you into a trading terminal" experience) --
+  // falls back to the homepage when the flag is off, same as before, so
+  // this is a no-op in the current (flag-off) default deployment.
+  const config = await fetch("/api/config").then((r) => r.json()).catch(() => ({}));
+  window.location.replace(config.realTradingEnabled ? "/trade.html" : "/");
 }
 
 connect();

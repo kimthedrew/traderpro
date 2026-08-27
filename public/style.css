@@ -17,6 +17,11 @@
   --up: #2fae66;
   --down: #d6524a;
 
+  /* Real-money warning color -- distinct from --up/--down (those are
+     reserved for price direction/PnL) and from --accent (branding). Used
+     only by Real Trading, the one feature that places real trades. */
+  --warn: #d6a92c;
+
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -394,6 +399,7 @@ nav .container {
 .status-live { color: var(--up); background: color-mix(in srgb, var(--up) 16%, transparent); }
 .status-building { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .status-planned { color: var(--text-muted); background: var(--surface-raised); }
+.status-live-real { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
 
 .feature-card p { color: var(--text-muted); font-size: 0.88rem; line-height: 1.55; margin: 0; }
 

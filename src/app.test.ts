@@ -61,3 +61,11 @@ test("static files are served from public/", async () => {
   const res = await fetch(`${baseUrl}/style.css`);
   assert.equal(res.status, 200);
 });
+
+// ENABLE_REAL_TRADING is unset in this test run (see .env.example's
+// default) -- the real-trading router must not even be mounted, so these
+// paths 404 like they genuinely don't exist, not just "hidden".
+test("real-trading routes 404 when ENABLE_REAL_TRADING is not set", async () => {
+  const res = await fetch(`${baseUrl}/api/real-trading/trades`);
+  assert.equal(res.status, 404);
+});

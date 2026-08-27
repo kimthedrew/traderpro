@@ -1,8 +1,11 @@
 # traderpro
 
 Deriv third-party trading app. Live market-data feed, Deriv OAuth2 login,
-Signals (live), and Copy Trading + Bot Builder (both real, both
-deliberately shadow/paper-mode-only — see their sections below for why).
+Signals (live), Copy Trading + Bot Builder (both real, both deliberately
+shadow/paper-mode-only — see their sections below for why), and Real
+Trading (Rise/Fall) — the first feature here that places a real trade with
+real money, feature-flagged off by default pending legal review (see its
+section below).
 
 Deriv migrated their API in 2026 to a REST + OAuth2/PKCE model (from the
 older single-WebSocket, `?app_id=` query-param API many older examples
@@ -34,9 +37,19 @@ still reference). This project is built against the current API.
   respectively. `server.ts`, `app.ts`, `app.js`, and `bots.js` all import
   from these instead of each keeping their own hand-synced copy.
 - `public/` &mdash; static frontend. `index.html` (ticker, Signals, Copy
-  Trading) and `bots.html` (Bot Builder) share `style.css`, `symbols.js`,
-  and `auth.js` (OAuth2 + PKCE login/logout, kept in one place since it's
-  security-sensitive code two drifting copies would be bad news for).
+  Trading), `bots.html` (Bot Builder), and `trade.html` (Real Trading)
+  share `style.css`, `symbols.js`, and `auth.js` (OAuth2 + PKCE
+  login/logout, kept in one place since it's security-sensitive code two
+  drifting copies would be bad news for).
+- `src/realTrading.ts` / `src/realTradingStore.ts` / `src/derivAuthClient.ts`
+  / `src/realTradingRoutes.ts` &mdash; Real Trading (Rise/Fall, real money):
+  pure request-building/response-parsing logic, Postgres storage, an
+  authenticated Deriv WebSocket client (separate from `derivClient.ts`'s
+  public-only one), and the routes themselves — mounted only when
+  `ENABLE_REAL_TRADING=true` (see its section below). `src/derivConfig.ts`
+  / `src/authHelpers.ts` hold the small pieces (`APP_ID`, `DERIV_API_BASE`,
+  `requireLogin`, `currentLoginId`) both `app.ts` and this route module
+  need, without the route module importing back into `app.ts`.
 
 ## Setup
 
@@ -120,8 +133,8 @@ else, with no code changes. `src/db.ts` runs its migration on boot but
 `DATABASE_URL` is unset — the ticker and static pages keep working
 either way, and login/session endpoints degrade to reporting "logged
 out" instead of crashing. Schema is currently `users`, `sessions`,
-`signals`, `followers`, `copy_trade_shadow_log`, `bots`, and
-`bot_paper_trades`; there's no migration *tool* yet (just idempotent
+`signals`, `followers`, `copy_trade_shadow_log`, `bots`,
+`bot_paper_trades`, and `real_trades`; there's no migration *tool* yet (just idempotent
 `CREATE TABLE IF NOT EXISTS` on boot) since this doesn't warrant one yet.
 
 **Confirmed against a real CockroachDB Cloud cluster** (Postgres-wire-
@@ -147,6 +160,18 @@ responses — since nothing ever does arithmetic on one, only equality and
 URL-building. Verified end-to-end against the real cluster: full bot
 create → paper-trade → update → delete lifecycle using its actual
 (large, string) generated ids.
+
+**A new, still-open instance of the same bug class** (Real Trading):
+`real_trades.deriv_contract_id`/`deriv_transaction_id` come from Deriv's
+own WebSocket JSON, not our database's id generation — `JSON.parse`
+itself would silently lose precision on a large numeric field *before*
+any `String()` coercion could help, if Deriv's ids ever exceed
+`Number.MAX_SAFE_INTEGER`. Unlike the CockroachDB case, this hasn't been
+confirmed either way (no real trade has been placed against a real
+account yet) — `src/realTrading.ts` coerces to `String(...)` immediately
+regardless, but a JSON reviver that preserves large integers as strings
+would be the real fix if this turns out to matter. Deliberately not added
+preemptively — see Real Trading below.
 
 ## Reliability
 
@@ -193,6 +218,21 @@ assumed fixed after the code looked right:
   the request. So this was never actually broken; the fix is still
   correct practice (accurate `req.ip`, no console noise), just not the
   severity first claimed.
+- **`src/derivClient.ts:47`**: `ws.once("error", reject)` only matters
+  until `connect()` resolves — after that, an `'error'` event has zero
+  listeners, which crashes the process the same way. Never hit in
+  practice for the single long-lived public tick feed, but the same
+  latent bug. `src/derivAuthClient.ts`'s `AuthenticatedDerivClient` (Real
+  Trading's authenticated client, which needs to survive a full
+  proposal→buy round trip, not just the connect handshake) uses a
+  persistent `ws.on("error", ...)` instead, re-emitted as a distinct
+  `socket_error` event rather than `"error"` (EventEmitter itself throws
+  on an unhandled `"error"` emit, which would just move the crash risk up
+  a level). Verified directly: a mock server test that emits a raw
+  socket error after `connect()` resolves confirms the process doesn't
+  crash and the client surfaces it as `socket_error` instead
+  (`src/derivAuthClient.test.ts`). `derivClient.ts` itself hasn't been
+  patched the same way yet — worth doing as a fast-follow.
 
 ## Signals
 
@@ -261,6 +301,57 @@ a single known leader's activity — that switch needs its own explicit
 design discussion, not just a config flag, whenever it's actually on the
 table.
 
+## Real Trading
+
+**The first feature here that places a real trade with real money** —
+Rise/Fall contracts only, on the account you're logged in as, feature-
+flagged off by default via `ENABLE_REAL_TRADING` (see `.env.example`).
+When unset, `/api/real-trading/*` isn't just hidden — the router isn't
+mounted at all (`src/app.ts`), so the routes 404 like they don't exist.
+`GET /api/config`'s `realTradingEnabled` field is a frontend-only hint
+used to show/hide the nav link and `/trade.html` page; it is **not** the
+real gate.
+
+Flow: `POST /api/real-trading/proposal` (get a price) → user confirms via
+an explicit "this places a real trade with real money" checkbox on
+`trade.html` → `POST /api/real-trading/buy` (place it, using exactly the
+proposal's own id/price — the server never lets the client supply its
+own). Both routes fetch a fresh, short-lived OTP'd WebSocket URL per
+attempt (`src/derivAuthClient.ts`) and open an authenticated connection
+scoped to that one proposal→buy exchange, then close it.
+
+**What's confirmed vs. not**, same honesty this project has applied to
+every other Deriv integration point before it's been tested live:
+
+- **Unconfirmed**: whether the OTP endpoint's `accountId` path segment is
+  the same value as `loginid` (assumed yes, consistent with how the rest
+  of the app already treats `loginid` as canonical).
+- **Unconfirmed**: whether one OTP'd socket supports a full proposal→buy
+  exchange, or only a single request (assumed the former).
+- **Unconfirmed**: the exact proposal/buy request+response field names,
+  and what a proposal-expired buy failure actually looks like on the wire.
+- **Unconfirmed**: whether `contract_id`/`transaction_id` need
+  precision-safe JSON parsing — Deriv's own ids aren't confirmed to stay
+  under `Number.MAX_SAFE_INTEGER` the way regular Postgres ids do (see
+  Persistence below for the related, already-fixed CockroachDB id issue —
+  this is a *new*, still-open instance of the same bug class).
+- **Unconfirmed**: real per-symbol min/max tick durations — `[5, 10]`
+  ticks is a deliberate scope-reduction guess for v1, not a discovered
+  Deriv constraint (see `TRADING_ROADMAP.md`).
+- **Unconfirmed**: whether a failed buy call can ever partially charge the
+  account. `POST /buy` records the trade attempt either way (`status:
+  "placed"` or `"error"`) so there's always an audit trail.
+
+Only Rise/Fall is supported — see `TRADING_ROADMAP.md` for what each other
+Deriv contract type (Multipliers, Touch/No Touch, Higher/Lower,
+Accumulators) would need.
+
+**Post-login landing**: `public/redirect.js` sends a freshly logged-in user
+to `/trade.html` instead of the homepage when `realTradingEnabled` is
+true — the client's requested "logs you into a trading terminal"
+experience — falling back to the homepage exactly as before when the flag
+is off, so this is a no-op in the current (flag-off) default deployment.
+
 ## Legal
 
 `public/terms.html` and `public/privacy.html` are a technically-informed
@@ -273,6 +364,13 @@ itself. Before relying on them:
   financial-promotion rules for Signals, and whether Copy Trading counts
   as regulated investment advice/portfolio management in a given
   jurisdiction even in shadow mode, and especially once live).
+- **Real Trading already exists in the codebase now**, behind
+  `ENABLE_REAL_TRADING` (off by default) — precisely *because* this
+  review hasn't happened yet. Unlike Copy Trading/Bot Builder's "shadow
+  mode until legal review, then a deliberate switch," this feature's real
+  trade-execution code is already written and flag-gated; flipping the
+  flag on in production without doing this review first is exactly the
+  scenario the flag exists to prevent.
 - A real contact address/email (both docs have a placeholder).
 - Governing law and limitation-of-liability language (both explicitly
   stubbed out, `[in brackets]`, in `terms.html`).
@@ -296,3 +394,12 @@ itself. Before relying on them:
   and Copy Trading's live-detection piece are both further along.
 - Confirm the `/accounts` response field names (see OAuth2 + PKCE flow
   above) against a real login.
+- Real Trading: everything under "What's confirmed vs. not" in the Real
+  Trading section above needs a real (demo strongly recommended first)
+  Deriv account to verify — OTP/proposal/buy shapes, the `accountId` =
+  `loginid` assumption, contract-id precision, and real per-symbol
+  duration limits. Also: settlement/outcome tracking (win/loss, not just
+  "placed") isn't built yet, and `derivClient.ts`'s public client hasn't
+  had the same persistent-error-handler fix `derivAuthClient.ts` got
+  (see Reliability above). Other contract types are scoped in
+  `TRADING_ROADMAP.md`.

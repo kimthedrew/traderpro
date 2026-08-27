@@ -10,20 +10,29 @@ import { getFollower, getShadowLog, upsertFollower } from "./copyTradingStore.js
 import { createBot, deleteBot, getBotsForOwner, getPaperTrades, updateBot } from "./botBuilderStore.js";
 import type { BotDirection } from "./botBuilder.js";
 import { TICKER_SYMBOLS } from "./symbols.js";
+import { APP_ID, DERIV_API_BASE } from "./derivConfig.js";
+import { SESSION_COOKIE, requireLogin, currentLoginId } from "./authHelpers.js";
+import { realTradingRouter } from "./realTradingRoutes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// DERIV_APP_ID is really an OAuth2 client_id (Deriv's dashboard just calls
-// it "App ID"). Registered per-app at https://developers.deriv.com.
-export const APP_ID = process.env.DERIV_APP_ID ?? "";
+export { APP_ID };
 export const REDIRECT_URI = process.env.OAUTH_REDIRECT_URL ?? "http://localhost:3000/redirect.html";
-const SESSION_COOKIE = "traderpro_sid";
 
 const DERIV_AUTH_URL = "https://auth.deriv.com/oauth2/auth";
 const DERIV_TOKEN_URL = "https://auth.deriv.com/oauth2/token";
-const DERIV_API_BASE = "https://api.derivws.com";
 // Least-privilege: only what login + displaying the account actually needs.
 const OAUTH_SCOPE = "trade account_manage";
+
+// Real Trading v1 (Rise/Fall, real money) is the first feature in this app
+// that ever places a real trade -- off by default, deliberately, until the
+// legal review the README has been flagging actually happens. See README
+// "Real Trading" for what this gates and why the gate is the router mount
+// below (routes don't exist at all when off), not a per-route check.
+const REAL_TRADING_ENABLED = process.env.ENABLE_REAL_TRADING === "true";
+if (!REAL_TRADING_ENABLED) {
+  console.warn("ENABLE_REAL_TRADING is not set -- real-trading routes are not registered (will 404).");
+}
 
 if (!APP_ID) {
   console.warn(
@@ -74,6 +83,10 @@ app.get("/api/config", (_req, res) => {
     redirectUri: REDIRECT_URI,
     authUrl: DERIV_AUTH_URL,
     scope: OAUTH_SCOPE,
+    // Frontend-only hint used to show/hide the Real Trading page/nav link.
+    // Not the real gate -- see the router mount below, which is what
+    // actually makes /api/real-trading/* not exist when this is false.
+    realTradingEnabled: REAL_TRADING_ENABLED,
   });
 });
 
@@ -181,38 +194,6 @@ app.get("/api/signals", async (_req, res) => {
     res.json({ signals: [] });
   }
 });
-
-async function currentLoginId(req: express.Request): Promise<string | null> {
-  const session = await getSession(req.cookies?.[SESSION_COOKIE]);
-  return session?.loginid ?? null;
-}
-
-// For routes that require login (as opposed to the GET routes above, which
-// degrade to a logged-out-shaped response on any failure). Distinguishes
-// "no session cookie" (genuinely not logged in -- 401 is correct) from "the
-// database errored out while checking" (401 would misreport a real,
-// logged-in user as logged out mid-outage -- this reports it honestly as
-// a server error instead).
-async function requireLogin(req: express.Request, res: express.Response): Promise<string | null> {
-  const cookie = req.cookies?.[SESSION_COOKIE];
-  if (!cookie) {
-    res.status(401).json({ error: "Not logged in" });
-    return null;
-  }
-  let session;
-  try {
-    session = await getSession(cookie);
-  } catch (err) {
-    console.error("Could not verify session (database unavailable?):", err);
-    res.status(502).json({ error: "Could not verify your session -- try again" });
-    return null;
-  }
-  if (!session) {
-    res.status(401).json({ error: "Not logged in" });
-    return null;
-  }
-  return session.loginid;
-}
 
 // Copy Trading v1: shadow-mode only -- see src/copyTrading.ts. These
 // endpoints manage a follower's own settings and let them see what would
@@ -389,6 +370,13 @@ app.get("/api/bots/:id/trades", async (req, res) => {
     res.json({ trades: [] });
   }
 });
+
+// Real Trading v1: only mounted when the flag is on, so the routes 404
+// like they genuinely don't exist when it's off -- see REAL_TRADING_ENABLED
+// above and README "Real Trading".
+if (REAL_TRADING_ENABLED) {
+  app.use("/api/real-trading", realTradingRouter);
+}
 
 // Relays live ticks from our backend Deriv WebSocket connection to the
 // browser over Server-Sent Events, proving the server <-> Deriv link works.

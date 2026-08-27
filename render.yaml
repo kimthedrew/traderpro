@@ -9,6 +9,19 @@ services:
         value: "33stOEdBBT6OJNq5sdS5f"
       - key: OAUTH_REDIRECT_URL
         value: https://traderpro-o4za.onrender.com/redirect.html
+      # Real Trading (Rise/Fall, real money -- see README "Real Trading").
+      # Turned on deliberately for live testing against a real Deriv
+      # account -- the proposal/buy request+response shapes have never
+      # been verified against Deriv's actual API before now. Left ON
+      # (not toggled back off after the first test) so the client can
+      # test it directly too -- this has NOT been through legal review.
+      - key: ENABLE_REAL_TRADING
+        value: "true"
+      # Conservative cap while the trade flow is still unverified live --
+      # limits exposure if something behaves unexpectedly on a real
+      # account. Raise or remove once the flow's been confirmed working.
+      - key: REAL_TRADING_MAX_STAKE
+        value: "1"
       # Pending on choosing a Postgres provider (Neon/Render/Supabase/etc) --
       # sync: false means Render won't manage this value; set it manually in
       # the dashboard once decided. Login/sessions degrade gracefully without

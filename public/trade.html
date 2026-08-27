@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0d12" />
+    <title>Real Trading — traderpro</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="trade.css" />
+  </head>
+  <body>
+    <nav>
+      <div class="container">
+        <a class="brand" href="/">
+          <svg viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M4 25 L13 15.5 L18.5 21 L27 8" fill="none" stroke="#5b8def" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M20 8 H27 V15" fill="none" stroke="#5b8def" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>
+            <span class="brand-text">traderpro</span>
+            <span class="brand-sub">powered by Deriv</span>
+          </span>
+        </a>
+        <div class="nav-actions">
+          <button class="btn btn-outline" id="nav-login-btn" type="button">Log In</button>
+          <a class="btn btn-solid" href="/">Back home</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container trade-page">
+      <p class="section-label">Real Trading</p>
+      <h1>Rise / Fall</h1>
+      <p class="trade-sub">Trade Rise/Fall contracts directly on your connected Deriv account.</p>
+
+      <div class="real-money-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L14.7 3.86a2 2 0 00-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <p><strong>This page places real trades with real money</strong> on your connected Deriv account. Trades cannot be undone once confirmed. This feature has not yet been through legal/compliance review.</p>
+      </div>
+
+      <div class="ct-card" id="trade-unavailable" hidden>
+        <p>Real trading isn't available yet on this deployment.</p>
+      </div>
+
+      <div id="trade-available">
+        <div class="ct-card" id="trade-logged-out">
+          <p>Log in with Deriv to trade.</p>
+        </div>
+
+        <div id="trade-logged-in" hidden>
+          <div class="ct-card trade-chart-card">
+            <div class="trade-chart-header">
+              <select id="trade-symbol"></select>
+              <span id="trade-current-price" class="ct-status" style="margin:0;"></span>
+            </div>
+            <canvas id="trade-chart" width="640" height="200"></canvas>
+            <p class="trade-chart-empty" id="trade-chart-empty">Waiting for live prices&hellip;</p>
+          </div>
+
+          <div class="ct-card trade-form-card">
+            <div class="trade-direction-row">
+              <button type="button" class="trade-direction-btn rise" id="trade-rise-btn">▲ Rise</button>
+              <button type="button" class="trade-direction-btn fall" id="trade-fall-btn">▼ Fall</button>
+            </div>
+
+            <div class="trade-fields">
+              <label>Duration
+                <select id="trade-duration">
+                  <option value="5">5 ticks</option>
+                  <option value="10">10 ticks</option>
+                </select>
+              </label>
+              <label>Stake
+                <input type="number" id="trade-stake" min="0.01" step="0.01" value="10" />
+              </label>
+              <button type="button" class="btn btn-outline" id="trade-get-price-btn">Get price</button>
+            </div>
+
+            <div class="trade-proposal" id="trade-proposal" hidden>
+              <div class="trade-proposal-row"><span class="label">Payout</span><span id="trade-proposal-payout"></span></div>
+              <div class="trade-proposal-row"><span class="label">Price</span><span id="trade-proposal-price"></span></div>
+            </div>
+
+            <label class="trade-confirm" id="trade-confirm-row" hidden>
+              <input type="checkbox" id="trade-confirm-checkbox" />
+              <span>I understand this places a real trade with real money on my Deriv account.</span>
+            </label>
+
+            <button type="button" class="btn btn-warn" id="trade-buy-btn" disabled hidden>Place trade</button>
+            <p class="ct-status" id="trade-status"></p>
+          </div>
+
+          <div class="ct-card trade-list-card">
+            <h2>Recent trades</h2>
+            <div id="trade-list"></div>
+            <p class="ct-status" id="trade-list-empty">No trades yet.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <div class="container">
+        <div class="disclaimer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L14.7 3.86a2 2 0 00-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <p><strong>Risk disclaimer.</strong> Deriv offers complex derivatives, such as options and contracts for difference ("CFDs"). These products may not be suitable for all clients, and trading them puts you at risk. You may lose some or all of the money you invest in a trade. Never trade with money you cannot afford to lose. <strong>Unlike every other feature on this site, Real Trading executes actual trades with real money on your account.</strong> This feature has not yet been reviewed by legal counsel — see the Terms of Service.</p>
+        </div>
+        <div class="footer-links">
+          <a href="/terms.html">Terms of Service</a>
+          <span aria-hidden="true">&middot;</span>
+          <a href="/privacy.html">Privacy Policy</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="symbols.js"></script>
+    <script src="auth.js"></script>
+    <script src="trade.js"></script>
+  </body>
+</html>

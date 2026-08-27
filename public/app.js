@@ -141,6 +141,15 @@ initNavAuth([navLoginBtn, navGetStartedBtn, heroLoginBtn]).then((session) => {
   }
 });
 
+// Real Trading is feature-flagged server-side (ENABLE_REAL_TRADING) -- this
+// is only a UI hide/show, the actual gate is the backend 404ing the routes
+// when it's off. See src/app.ts.
+loadOAuthConfig().then((config) => {
+  if (!config.realTradingEnabled) return;
+  document.getElementById("nav-trade-link").hidden = false;
+  document.getElementById("feature-card-real-trading").hidden = false;
+});
+
 // Copy Trading (shadow mode): shows a follower's own settings + what would
 // have been copied, without ever placing a real trade.
 const ctLoggedOut = document.getElementById("ct-logged-out");

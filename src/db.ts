@@ -112,6 +112,33 @@ async function runMigrations() {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS bot_paper_trades_bot_created_idx ON bot_paper_trades (bot_id, created_at DESC)`);
+
+  // Real Trading v1 (Rise/Fall only, real money, feature-flagged off by
+  // default via ENABLE_REAL_TRADING) -- see README "Real Trading". Unlike
+  // every other table above, rows here can represent a real placed trade.
+  // Settlement/outcome (win/loss) tracking is out of scope for v1 -- status
+  // only records whether the buy call itself succeeded.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS real_trades (
+      id BIGSERIAL PRIMARY KEY,
+      owner_loginid TEXT NOT NULL REFERENCES users(loginid) ON DELETE CASCADE,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      contract_type TEXT NOT NULL,
+      stake DOUBLE PRECISION NOT NULL,
+      duration INTEGER NOT NULL,
+      duration_unit TEXT NOT NULL,
+      currency TEXT NOT NULL,
+      deriv_contract_id TEXT,
+      deriv_transaction_id TEXT,
+      buy_price DOUBLE PRECISION,
+      payout DOUBLE PRECISION,
+      status TEXT NOT NULL DEFAULT 'placed',
+      error_message TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS real_trades_owner_created_idx ON real_trades (owner_loginid, created_at DESC)`);
 }
 
 // Runs once per process on first import. Fine at this schema size (two
