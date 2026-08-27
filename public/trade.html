@@ -71,8 +71,8 @@
                   <option value="10">10 ticks</option>
                 </select>
               </label>
-              <label>Stake
-                <input type="number" id="trade-stake" min="0.01" step="0.01" value="10" />
+              <label>Stake <span class="ct-optional" id="trade-stake-cap"></span>
+                <input type="number" id="trade-stake" min="0.01" step="0.01" max="1" value="1" />
               </label>
               <button type="button" class="btn btn-outline" id="trade-get-price-btn">Get price</button>
             </div>

@@ -32,7 +32,9 @@ const DIRECTIONS = new Set<RiseFallDirection>(["rise", "fall"]);
 // pre-legal-review window. A deliberate scope reduction, not a discovered
 // Deriv constraint -- see TRADING_ROADMAP.md.
 const ALLOWED_DURATIONS = new Set([5, 10]);
-const MAX_STAKE = process.env.REAL_TRADING_MAX_STAKE ? Number(process.env.REAL_TRADING_MAX_STAKE) : null;
+// Exported so /api/config can tell the frontend the real cap, instead of
+// the UI guessing/hardcoding a value that could drift from this one.
+export const MAX_STAKE = process.env.REAL_TRADING_MAX_STAKE ? Number(process.env.REAL_TRADING_MAX_STAKE) : null;
 
 type TradeInput = { symbol: string; direction: RiseFallDirection; stake: number; duration: number };
 

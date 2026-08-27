@@ -12,7 +12,7 @@ import type { BotDirection } from "./botBuilder.js";
 import { TICKER_SYMBOLS } from "./symbols.js";
 import { APP_ID, DERIV_API_BASE } from "./derivConfig.js";
 import { SESSION_COOKIE, requireLogin, currentLoginId } from "./authHelpers.js";
-import { realTradingRouter } from "./realTradingRoutes.js";
+import { realTradingRouter, MAX_STAKE as REAL_TRADING_MAX_STAKE } from "./realTradingRoutes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -87,6 +87,9 @@ app.get("/api/config", (_req, res) => {
     // Not the real gate -- see the router mount below, which is what
     // actually makes /api/real-trading/* not exist when this is false.
     realTradingEnabled: REAL_TRADING_ENABLED,
+    // So the UI can show/enforce the real cap instead of guessing one --
+    // the server still re-validates this itself, this is a display hint.
+    realTradingMaxStake: REAL_TRADING_MAX_STAKE,
   });
 });
 

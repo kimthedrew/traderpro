@@ -203,6 +203,12 @@ async function boot() {
     return;
   }
 
+  if (typeof config.realTradingMaxStake === "number") {
+    stakeInput.max = String(config.realTradingMaxStake);
+    if (Number(stakeInput.value) > config.realTradingMaxStake) stakeInput.value = String(config.realTradingMaxStake);
+    document.getElementById("trade-stake-cap").textContent = `(capped at ${config.realTradingMaxStake} while this is being tested)`;
+  }
+
   const session = await initNavAuth([navLoginBtn]);
   if (session.loggedIn) navLoginBtn.textContent = session.loginid;
   tradeLoggedOut.hidden = session.loggedIn;
