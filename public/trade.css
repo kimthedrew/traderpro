@@ -36,6 +36,22 @@
   font-family: inherit;
 }
 
+.trade-price-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.trade-price-pill #trade-current-price { font-weight: 700; font-size: 0.95rem; }
+.trade-delta { font-size: 0.8rem; font-weight: 600; }
+.trade-delta.up { color: var(--up); }
+.trade-delta.down { color: var(--down); }
+.trade-delta.neutral { color: var(--text-muted); }
+
 #trade-chart { width: 100%; height: 200px; display: block; border-radius: 6px; background: var(--surface-raised); }
 .trade-chart-empty { text-align: center; color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem; }
 
@@ -81,6 +97,9 @@
 .btn-warn { background: var(--warn); color: #1a1204; }
 .btn-warn:hover { filter: brightness(1.08); }
 .btn-warn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+
+.trade-powered-by { text-align: center; color: var(--text-muted); font-size: 0.75rem; margin: 0.85rem 0 0; }
+.trade-powered-by strong { color: var(--text); }
 
 .trade-list-card { margin-top: 1.5rem; }
 .trade-list-card h2 { font-size: 1rem; margin: 0 0 1rem; }

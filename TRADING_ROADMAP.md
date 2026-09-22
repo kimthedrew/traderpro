@@ -36,6 +36,13 @@ No fixed duration and no barrier — payout grows each tick the price stays with
 - **UI changes**: needs live "how much would this be worth if I sold right now" tracking and a manual "cash out" action — closer to Multipliers' UI needs than Rise/Fall's.
 - **Risk/compliance**: the most different from Rise/Fall of anything here — effectively deserves its own feature design pass rather than being bolted onto the existing Real Trading page.
 
+## Rise/Fall improvements, found by comparing against Deriv's own App Builder templates
+
+Deriv's own no-code app builder (`developers.deriv.com/dashboard/builder/`) ships a Rise/Fall template built against their real API, which surfaced two gaps in v1 worth closing before considering Rise/Fall "done" (both are deferred, not scope-cut for a good reason the way the contract types above are — just bigger than pure visual polish, so held until the base flow is confirmed working live):
+
+- **Streaming proposal, not one-shot**: Deriv's template shows the current payout live on the Buy button itself, continuously updating ("Buy / Payout 19.53 USD"), which means their `proposal` request is used with `subscribe: 1` and kept open, not a single request/response the way `POST /api/real-trading/proposal` does it now. Matching this means keeping a subscription alive for as long as the trade form is open (re-rendering the button on every update) rather than a per-click fetch — a real architecture change to `derivAuthClient.ts`'s usage in `realTradingRoutes.ts`, not just a frontend tweak.
+- **"Allow equals" variant**: Deriv's Rise/Fall template has a toggle for "Rise/Fall" vs. "Rise/Fall or equal" — a different `contract_type` on their side (commonly `CALLE`/`PUTE` instead of `CALL`/`PUT` in Deriv's API, unconfirmed against this codebase). `src/realTrading.ts`'s `contractTypeForDirection` would need a second parameter for this; not built.
+
 ## Suggested order
 
 Higher/Lower first (smallest addition to what already exists) → Touch/No Touch (reuses the chart for barrier visualization) → Multipliers and Accumulators last, since both need a genuinely different UI shape (no-expiry, live P&L) rather than an extension of the existing proposal-then-buy flow.

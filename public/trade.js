@@ -6,7 +6,9 @@ const tradeLoggedOut = document.getElementById("trade-logged-out");
 const tradeLoggedIn = document.getElementById("trade-logged-in");
 
 const symbolSelect = document.getElementById("trade-symbol");
+const pricePill = document.getElementById("trade-price-pill");
 const currentPriceEl = document.getElementById("trade-current-price");
+const currentDeltaEl = document.getElementById("trade-current-delta");
 const chartCanvas = document.getElementById("trade-chart");
 const chartEmpty = document.getElementById("trade-chart-empty");
 const riseBtn = document.getElementById("trade-rise-btn");
@@ -75,15 +77,32 @@ function drawChart() {
   const range = max - min || 1;
   const pad = 10;
 
+  const xAt = (i) => pad + (i / (MAX_CHART_POINTS - 1)) * (w - pad * 2);
+  const yAt = (q) => h - pad - ((q - min) / range) * (h - pad * 2);
+  const up = chartPoints[chartPoints.length - 1].quote >= chartPoints[0].quote;
+  const lineColor = up ? "#2fae66" : "#d6524a";
+
+  // Shaded area under the line, fading to transparent -- matches the
+  // filled-chart look Deriv's own trading templates use.
+  ctx.beginPath();
+  ctx.moveTo(xAt(0), h - pad);
+  chartPoints.forEach((p, i) => ctx.lineTo(xAt(i), yAt(p.quote)));
+  ctx.lineTo(xAt(chartPoints.length - 1), h - pad);
+  ctx.closePath();
+  const gradient = ctx.createLinearGradient(0, 0, 0, h);
+  gradient.addColorStop(0, up ? "rgba(47,174,102,0.28)" : "rgba(214,82,74,0.28)");
+  gradient.addColorStop(1, "rgba(47,174,102,0)");
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
   ctx.beginPath();
   chartPoints.forEach((p, i) => {
-    const x = pad + (i / (MAX_CHART_POINTS - 1)) * (w - pad * 2);
-    const y = h - pad - ((p.quote - min) / range) * (h - pad * 2);
+    const x = xAt(i);
+    const y = yAt(p.quote);
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
-  const up = chartPoints[chartPoints.length - 1].quote >= chartPoints[0].quote;
-  ctx.strokeStyle = up ? "#2fae66" : "#d6524a";
+  ctx.strokeStyle = lineColor;
   ctx.lineWidth = 2;
   ctx.stroke();
 }
@@ -99,7 +118,17 @@ stream.addEventListener("tick", (event) => {
   const { symbol, quote } = JSON.parse(event.data);
   if (symbol !== symbolSelect.value) return;
   chartEmpty.hidden = true;
+  pricePill.hidden = false;
   currentPriceEl.textContent = quote.toFixed(2);
+
+  const previous = chartPoints[chartPoints.length - 1]?.quote;
+  if (previous !== undefined) {
+    const changePct = ((quote - previous) / previous) * 100;
+    const up = quote >= previous;
+    currentDeltaEl.textContent = `${up ? "▲" : "▼"} ${Math.abs(changePct).toFixed(3)}%`;
+    currentDeltaEl.className = `trade-delta ${up ? "up" : "down"}`;
+  }
+
   chartPoints.push({ quote, epoch: Date.now() });
   if (chartPoints.length > MAX_CHART_POINTS) chartPoints.shift();
   drawChart();
@@ -107,6 +136,9 @@ stream.addEventListener("tick", (event) => {
 
 symbolSelect.addEventListener("change", () => {
   currentPriceEl.textContent = "";
+  currentDeltaEl.textContent = "";
+  currentDeltaEl.className = "trade-delta neutral";
+  pricePill.hidden = true;
   resetChart();
 });
 

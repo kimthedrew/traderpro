@@ -6,7 +6,7 @@ services:
     plan: free
     envVars:
       - key: DERIV_APP_ID
-        value: "33stOEdBBT6OJNq5sdS5f"
+        value: "348BYyfpDnVQOvKUF83Ek"
       - key: OAUTH_REDIRECT_URL
         value: https://traderpro-o4za.onrender.com/redirect.html
       # Real Trading (Rise/Fall, real money -- see README "Real Trading").

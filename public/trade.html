@@ -52,7 +52,10 @@
           <div class="ct-card trade-chart-card">
             <div class="trade-chart-header">
               <select id="trade-symbol"></select>
-              <span id="trade-current-price" class="ct-status" style="margin:0;"></span>
+              <span class="trade-price-pill" id="trade-price-pill" hidden>
+                <span id="trade-current-price"></span>
+                <span class="trade-delta neutral" id="trade-current-delta"></span>
+              </span>
             </div>
             <canvas id="trade-chart" width="640" height="200"></canvas>
             <p class="trade-chart-empty" id="trade-chart-empty">Waiting for live prices&hellip;</p>
@@ -89,6 +92,7 @@
 
             <button type="button" class="btn btn-warn" id="trade-buy-btn" disabled hidden>Place trade</button>
             <p class="ct-status" id="trade-status"></p>
+            <p class="trade-powered-by">Powered by <strong>Deriv</strong></p>
           </div>
 
           <div class="ct-card trade-list-card">
