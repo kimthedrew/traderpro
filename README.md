@@ -27,7 +27,9 @@ still reference). This project is built against the current API.
   switch one out for another.
 - `src/sessionStore.ts` &mdash; session store backed by Postgres (`users` +
   `sessions` tables), keyed by an httpOnly cookie; holds each logged-in
-  user's OAuth2 access token server-side.
+  user's OAuth2 access token server-side, every Deriv account (demo/real)
+  that login covers, and which one is currently active (see "Demo vs.
+  real accounts" below).
 - `src/signals.ts` / `src/copyTrading.ts` / `src/botBuilder.ts` &mdash; pure,
   unit-tested logic for each feature (detection, shadow-copy math, bot
   matching), separate from their `*Store.ts` counterparts which do the
@@ -98,10 +100,12 @@ still reference). This project is built against the current API.
    then posts `{ code, codeVerifier }` to the backend — never the browser's
    job to talk to Deriv's token endpoint directly.
 5. `POST /api/session` exchanges those for an access token at
-   `https://auth.deriv.com/oauth2/token`, fetches the account via
-   `GET https://api.derivws.com/trading/v1/options/accounts`, and hands the
-   browser back only an httpOnly session cookie. The access token itself
-   never reaches browser JS.
+   `https://auth.deriv.com/oauth2/token`, fetches every account this login
+   covers via `GET https://api.derivws.com/trading/v1/options/accounts`
+   (a user typically has both a demo and a real account, sometimes more —
+   see "Demo vs. real accounts" below), and hands the browser back only an
+   httpOnly session cookie. The access token itself never reaches browser
+   JS.
 6. `GET /api/session` / `DELETE /api/session` cover login-state checks and
    logout. Sessions live in Postgres now (see Persistence below), so they
    survive a restart or crash. The session cookie's lifetime matches the
@@ -112,16 +116,31 @@ still reference). This project is built against the current API.
    server had already started rejecting it and silently reporting them as
    logged out.
 
-Note: the exact field names in the `/accounts` response (`loginid` vs
-`login_id` vs `id`) haven't been confirmed against a real login yet —
-`src/app.ts` falls back across the likely variants. Worth double-checking
-once someone logs in for real, and tightening up if the guess was wrong.
+**Demo vs. real accounts.** Deriv's `/accounts` response returns every
+account the login covers, each with its own `account_id` and
+`account_type` (`"demo"` or `"real"`) — confirmed against Deriv's own App
+Builder template source (`packages/core/src/types/auth.ts`'s
+`DerivAccount`, `packages/core/src/auth/accounts.ts`). `POST /api/session`
+stores the full list (`sessions.accounts`, JSONB) and activates the first
+one by default, same as Deriv's own template does. `POST
+/api/session/switch-account` lets the user switch to any other account
+from that same list — a demo account, or a different currency — **without
+a new OAuth login**, since one access token is valid for requesting an
+OTP'd WebSocket URL against any account it returned; `switchSessionAccount`
+(`src/sessionStore.ts`) checks the requested id against the session's own
+stored list before switching, so a session can never be pointed at an
+account that isn't actually its own. `public/auth.js`'s
+`renderAccountBadge` shows a DEMO/REAL badge and the switcher (when more
+than one account exists) in the nav on every page; `trade.html` also
+swaps its real-money warning banner for a calmer "no real money at risk"
+one while a demo account is active.
 
-For real-time *authenticated* data (balance, portfolio — not built yet),
-Deriv's model is different from the ticker: request a short-lived,
-single-use OTP'd WebSocket URL via
-`POST /trading/v1/options/accounts/{accountId}/otp` (needs the access
-token), then connect to that URL directly. Not a long-lived authorized
+For real-time *authenticated* data (balance, portfolio — see Real Trading
+below for the one place this is built so far), Deriv's model is different
+from the public ticker: request a short-lived, single-use OTP'd WebSocket
+URL via `POST /trading/v1/options/accounts/{accountId}/otp` (needs the
+access token; `{accountId}` is the same `account_id` from `/accounts`
+above), then connect to that URL directly. Not a long-lived authorized
 socket like the old API.
 
 ## Persistence

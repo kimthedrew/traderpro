@@ -35,6 +35,7 @@ Object.entries(SYMBOL_NAMES).forEach(([value, label]) => {
 
 let direction = null; // "rise" | "fall"
 let currency = "";
+let isDemo = false;
 let currentProposal = null; // { proposalId, askPrice, payout }
 
 function clearProposal() {
@@ -171,7 +172,7 @@ getPriceBtn.addEventListener("click", async () => {
   proposalEl.hidden = false;
   confirmRow.hidden = false;
   buyBtn.hidden = false;
-  buyBtn.textContent = `Place trade — ${Number(stakeInput.value).toFixed(2)} ${currency}, real money`;
+  buyBtn.textContent = `Place trade — ${Number(stakeInput.value).toFixed(2)} ${currency}${isDemo ? " (demo)" : ", real money"}`;
 });
 
 confirmCheckbox.addEventListener("change", () => {
@@ -245,9 +246,24 @@ async function boot() {
   if (session.loggedIn) navLoginBtn.textContent = session.loginid;
   tradeLoggedOut.hidden = session.loggedIn;
   tradeLoggedIn.hidden = !session.loggedIn;
+  renderAccountBadge(document.getElementById("nav-account"), session);
   if (!session.loggedIn) return;
 
   currency = session.currency ?? "";
+
+  // Demo accounts risk nothing real -- the banner shouldn't compete for
+  // attention with the real-money warning when that's the active account.
+  isDemo = session.accountType === "demo";
+  const banner = document.getElementById("trade-money-banner");
+  const bannerText = document.getElementById("trade-money-banner-text");
+  banner.classList.toggle("demo", isDemo);
+  bannerText.innerHTML = isDemo
+    ? "<strong>You're trading on a demo account</strong> -- no real money is at risk. Switch accounts in the nav bar to trade for real."
+    : "<strong>This page places real trades with real money</strong> on your connected Deriv account. Trades cannot be undone once confirmed. This feature has not yet been through legal/compliance review.";
+  document.getElementById("trade-confirm-text").textContent = isDemo
+    ? "I understand this places a trade on my demo account (no real money)."
+    : "I understand this places a real trade with real money on my Deriv account.";
+
   resetChart();
   loadTrades();
 }

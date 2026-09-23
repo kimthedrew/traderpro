@@ -120,6 +120,7 @@ initNavAuth([navLoginBtn]).then((session) => {
   if (session.loggedIn) navLoginBtn.textContent = session.loginid;
   loggedOut.hidden = session.loggedIn;
   loggedIn.hidden = !session.loggedIn;
+  renderAccountBadge(document.getElementById("nav-account"), session);
   if (session.loggedIn) loadBots();
 });
 

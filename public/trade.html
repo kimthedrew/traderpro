@@ -24,6 +24,7 @@
         </a>
         <div class="nav-actions">
           <a class="btn btn-outline" href="/bots.html">Bots</a>
+          <span class="nav-account" id="nav-account"></span>
           <button class="btn btn-outline" id="nav-login-btn" type="button">Log In</button>
           <a class="btn btn-solid" href="/">Back home</a>
         </div>
@@ -35,9 +36,9 @@
       <h1>Rise / Fall</h1>
       <p class="trade-sub">Trade Rise/Fall contracts directly on your connected Deriv account.</p>
 
-      <div class="real-money-banner">
+      <div class="real-money-banner" id="trade-money-banner">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L14.7 3.86a2 2 0 00-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <p><strong>This page places real trades with real money</strong> on your connected Deriv account. Trades cannot be undone once confirmed. This feature has not yet been through legal/compliance review.</p>
+        <p id="trade-money-banner-text"><strong>This page places real trades with real money</strong> on your connected Deriv account. Trades cannot be undone once confirmed. This feature has not yet been through legal/compliance review.</p>
       </div>
 
       <div class="ct-card" id="trade-unavailable" hidden>
@@ -88,7 +89,7 @@
 
             <label class="trade-confirm" id="trade-confirm-row" hidden>
               <input type="checkbox" id="trade-confirm-checkbox" />
-              <span>I understand this places a real trade with real money on my Deriv account.</span>
+              <span id="trade-confirm-text">I understand this places a real trade with real money on my Deriv account.</span>
             </label>
 
             <button type="button" class="btn btn-warn" id="trade-buy-btn" disabled hidden>Place trade</button>

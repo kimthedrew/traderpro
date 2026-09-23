@@ -139,6 +139,7 @@ initNavAuth([navLoginBtn, navGetStartedBtn, heroLoginBtn]).then((session) => {
     navGetStartedBtn.textContent = "Log Out";
     heroLoginBtn.textContent = "Log Out";
   }
+  renderAccountBadge(document.getElementById("nav-account"), session);
 });
 
 // Real Trading is feature-flagged server-side (ENABLE_REAL_TRADING) -- this

@@ -20,6 +20,15 @@
 .real-money-banner svg { width: 1.15rem; height: 1.15rem; flex: none; margin-top: 0.1rem; color: var(--warn); }
 .real-money-banner strong { color: var(--warn); }
 
+/* Calmer styling when the active account is demo -- no real money is at
+   risk, so this shouldn't compete visually with the real-account warning. */
+.real-money-banner.demo {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.real-money-banner.demo svg,
+.real-money-banner.demo strong { color: var(--accent); }
+
 #trade-unavailable p { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin: 0; }
 #trade-logged-out p { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin: 0; }
 

@@ -84,6 +84,31 @@ nav .container {
 
 .nav-actions { display: flex; align-items: center; gap: 0.75rem; }
 
+.nav-account { display: flex; align-items: center; gap: 0.4rem; }
+
+.account-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+}
+/* Real carries actual money risk, so it's the one that should stand out;
+   demo is calm/neutral -- same color reasoning as --warn elsewhere. */
+.account-badge.demo { color: var(--text-muted); background: var(--surface-raised); }
+.account-badge.real { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+
+.account-switcher {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.4rem 0.5rem;
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+
 .btn {
   font-size: 0.88rem;
   font-weight: 600;

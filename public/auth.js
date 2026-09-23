@@ -61,3 +61,44 @@ async function initNavAuth(buttons) {
   buttons.forEach((btn) => btn && btn.addEventListener("click", handler));
   return session;
 }
+
+// Renders a DEMO/REAL badge, plus a switcher when the login covers more
+// than one account (demo and real are separate Deriv accounts under the
+// same OAuth login) -- switching doesn't need a new Deriv login, just
+// POSTs which account id to make active. Shared across every page since a
+// user can land on any of them post-login; a page just needs a container
+// element in its nav next to the login button.
+async function renderAccountBadge(container, session) {
+  container.innerHTML = "";
+  if (!session.loggedIn) return;
+
+  const badge = document.createElement("span");
+  badge.className = `account-badge ${session.accountType}`;
+  badge.textContent = session.accountType === "demo" ? "DEMO" : "REAL";
+  container.append(badge);
+
+  if (session.accounts && session.accounts.length > 1) {
+    const select = document.createElement("select");
+    select.className = "account-switcher";
+    session.accounts.forEach((account) => {
+      const opt = document.createElement("option");
+      opt.value = account.accountId;
+      opt.textContent = `${account.accountType === "demo" ? "Demo" : "Real"} · ${account.currency}`;
+      if (account.accountId === session.loginid) opt.selected = true;
+      select.append(opt);
+    });
+    select.addEventListener("change", async () => {
+      select.disabled = true;
+      await fetch("/api/session/switch-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: select.value }),
+      });
+      // Simplest correct thing: every page's state (bots, trades, balance
+      // cap, etc.) is keyed off the active account, so a full reload beats
+      // trying to patch every affected piece of UI in place.
+      window.location.reload();
+    });
+    container.append(select);
+  }
+}

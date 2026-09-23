@@ -4,7 +4,7 @@ import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createSession, destroySession, getSession } from "./sessionStore.js";
+import { createSession, destroySession, getSession, switchSessionAccount, type DerivAccountSummary } from "./sessionStore.js";
 import { getRecentSignals } from "./signalsStore.js";
 import { getFollower, getShadowLog, upsertFollower } from "./copyTradingStore.js";
 import { createBot, deleteBot, getBotsForOwner, getPaperTrades, updateBot } from "./botBuilderStore.js";
@@ -133,20 +133,25 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
       res.status(401).json({ error: "Could not fetch your Deriv account", stage: "account_fetch", status: accountsRes.status });
       return;
     }
-    const { data: accounts } = await accountsRes.json();
-    const account = accounts?.[0] ?? {};
+    const { data: rawAccounts } = await accountsRes.json();
     // CONFIRMED against Deriv's own official App Builder template source
-    // (packages/core/src/types/auth.ts's DerivAccount interface): the
-    // /accounts response's account identifier field is `account_id`, not
-    // `loginid`/`login_id`/`id` -- none of those exist on the real response.
-    // This was silently wrong before: every login fell through to the
-    // "account" fallback, meaning every user collided on the same
-    // users.loginid row. account_id doubles as the OTP endpoint's
-    // {accountId} path param too (see derivAuthClient.ts), so this one
-    // field is both our internal "loginid" and Deriv's real identifier --
-    // there's no separate concept to reconcile.
-    const loginid = account.account_id ?? account.loginid ?? "account";
-    const currency = account.currency ?? "";
+    // (packages/core/src/types/auth.ts's DerivAccount interface): each
+    // account's identifier field is `account_id` (not `loginid`/`login_id`/
+    // `id`, none of which exist on the real response), and `account_type`
+    // is `"demo" | "real"`. This was silently wrong before: every login
+    // fell through to the "account" fallback, meaning every user collided
+    // on the same users.loginid row. account_id doubles as the OTP
+    // endpoint's {accountId} path param too (see derivAuthClient.ts), so
+    // this one field is both our internal "loginid" and Deriv's real
+    // identifier -- there's no separate concept to reconcile.
+    const accounts: DerivAccountSummary[] = (rawAccounts ?? [])
+      .filter((a: any) => a.account_id)
+      .map((a: any) => ({ accountId: a.account_id, accountType: a.account_type === "demo" ? "demo" : "real", currency: a.currency ?? "" }));
+    // Same default as Deriv's own template (fetchedAccounts[0]) -- the user
+    // can switch to another of their accounts (e.g. demo) afterward via
+    // POST /api/session/switch-account, no new OAuth login required.
+    const active = accounts[0] ?? { accountId: "account", accountType: "real" as const, currency: "" };
+    const { accountId: loginid, accountType, currency } = active;
 
     // Deriv's docs show a 3600s (1h) access token lifetime; fall back to
     // that if expires_in is ever missing from the response. The cookie's
@@ -156,14 +161,14 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
     // (which filters on expires_at) had already started silently
     // rejecting it and reporting the user as logged out.
     const sessionLifetimeSeconds = expiresIn ?? 3600;
-    const sessionId = await createSession({ loginid, currency, accessToken, expiresInSeconds: sessionLifetimeSeconds });
+    const sessionId = await createSession({ loginid, currency, accountType, accounts, accessToken, expiresInSeconds: sessionLifetimeSeconds });
     res.cookie(SESSION_COOKIE, sessionId, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       maxAge: sessionLifetimeSeconds * 1000,
     });
-    res.json({ loginid, currency });
+    res.json({ loginid, currency, accountType, accounts });
   } catch (err) {
     console.error("Deriv OAuth login failed unexpectedly:", err);
     res.status(502).json({ error: "Unexpected error talking to Deriv", stage: "unexpected" });
@@ -177,7 +182,13 @@ app.get("/api/session", async (req, res) => {
       res.json({ loggedIn: false });
       return;
     }
-    res.json({ loggedIn: true, loginid: session.loginid, currency: session.currency });
+    res.json({
+      loggedIn: true,
+      loginid: session.loginid,
+      currency: session.currency,
+      accountType: session.accountType,
+      accounts: session.accounts,
+    });
   } catch (err) {
     console.error("Could not look up session (database unavailable?):", err);
     res.json({ loggedIn: false });
@@ -192,6 +203,33 @@ app.delete("/api/session", async (req, res) => {
   }
   res.clearCookie(SESSION_COOKIE);
   res.json({ loggedIn: false });
+});
+
+// Switches which of the user's own Deriv accounts (e.g. demo <-> real) is
+// active for this session -- no new OAuth login needed, the access token
+// already covers every account switchSessionAccount validates against.
+app.post("/api/session/switch-account", async (req, res) => {
+  const cookie = req.cookies?.[SESSION_COOKIE];
+  if (!cookie) {
+    res.status(401).json({ error: "Not logged in" });
+    return;
+  }
+  const { accountId } = req.body ?? {};
+  if (typeof accountId !== "string" || !accountId) {
+    res.status(400).json({ error: "Invalid account id" });
+    return;
+  }
+  try {
+    const updated = await switchSessionAccount(cookie, accountId);
+    if (!updated) {
+      res.status(400).json({ error: "Not one of your accounts" });
+      return;
+    }
+    res.json({ loginid: updated.loginid, currency: updated.currency, accountType: updated.accountType });
+  } catch (err) {
+    console.error("Could not switch account (database unavailable?):", err);
+    res.status(502).json({ error: "Could not switch account" });
+  }
 });
 
 // History for the live signals feed's initial page load; new ones arrive

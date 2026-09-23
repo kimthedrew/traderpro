@@ -33,6 +33,13 @@ async function runMigrations() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  // account_type distinguishes a demo (virtual funds) account from a real
+  // one -- each is a distinct Deriv account_id/loginid, so this is a plain
+  // property of the row, not session state. Added after the fact via
+  // ADD COLUMN IF NOT EXISTS (idempotent, same pattern as every other
+  // migration here) rather than folded into the CREATE TABLE above, since
+  // existing deployed users rows predate this column.
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type TEXT NOT NULL DEFAULT 'real'`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
@@ -42,6 +49,11 @@ async function runMigrations() {
       expires_at TIMESTAMPTZ NOT NULL
     )
   `);
+  // The full list of Deriv accounts (demo + real) this OAuth login covers,
+  // captured once at login time -- lets a user switch which account is
+  // active (see sessionStore.ts's switchSessionAccount) without a new
+  // OAuth round trip, since one access token is valid for any of them.
+  await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS accounts JSONB NOT NULL DEFAULT '[]'`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS signals (
       id BIGSERIAL PRIMARY KEY,
