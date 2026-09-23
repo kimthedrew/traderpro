@@ -373,14 +373,30 @@ just educated guesses, and caught two real bugs in the process:
   risk flagged under Persistence below is real in principle but less
   likely to bite than it looked before. Still coerced to `String()`
   regardless, since that costs nothing either way.
-- **Still unconfirmed, needs a real account**: whether one OTP'd socket
-  supports a full proposal→buy exchange or only a single request (this
-  app assumes the former); what a proposal-expired buy failure actually
-  looks like on the wire; whether a failed buy call can ever partially
+- **Fixed, confirmed live against a real account**: a proposal is only
+  valid on the WebSocket connection it was requested on. The original
+  implementation opened a fresh OTP'd connection per HTTP request and
+  closed it immediately after — meaning `/proposal` got a valid quote,
+  but `/buy` (a *different* connection) always failed with Deriv's
+  `InvalidContractProposal: Unknown contract proposal`, confirmed
+  directly in Render's logs on the first live test. Fixed by keeping the
+  proposal's connection open in memory (keyed by `loginid`,
+  `realTradingRoutes.ts`'s `pendingProposals`) until `/buy` consumes it
+  or a 60s TTL expires it; `/buy` also now rejects a `proposalId`/`price`
+  that doesn't match what's actually pending, instead of forwarding
+  whatever the client sent straight to Deriv.
+- **Confirmed live**: `ask_price`/`payout`/`spot`/`contract_id`/
+  `transaction_id`/`buy_price`/`longcode` field names, `CALL`/`PUT` for
+  Rise/Fall, and the OTP/token-exchange flow all work end-to-end against
+  a real account once the above was fixed — a full "Get price" → "Place
+  trade" round trip has been completed successfully in production.
+- **Still unconfirmed**: whether a failed buy call can ever partially
   charge the account (`POST /buy` records the attempt either way —
   `status: "placed"` or `"error"` — so there's always an audit trail);
   real per-symbol min/max tick durations (`[5, 10]` is a deliberate
-  scope-reduction guess, not a discovered constraint).
+  scope-reduction guess, not a discovered constraint); whether Deriv's
+  short-lived-proposal window is meaningfully shorter than the 60s TTL
+  this app now assumes.
 - **Confirmed as a real gap, not built**: Deriv's own template keeps the
   proposal *subscribed* (`subscribe: 1`), showing a live-updating payout
   directly on the Buy button; this app does a one-shot request per "Get

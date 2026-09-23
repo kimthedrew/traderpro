@@ -74,3 +74,24 @@ test("invalid input is rejected with 400 before any Deriv network call is attemp
     await destroySession(sessionId);
   }
 });
+
+// Regression test for a real bug found live: a proposal is only valid on
+// the connection it was requested on, so /buy has to be rejected cleanly
+// (not attempted against Deriv at all) when there's no live proposal
+// pending for this user -- rather than opening a fresh connection and
+// getting Deriv's InvalidContractProposal error, which is what used to
+// happen before this was fixed.
+test("POST /buy with no prior /proposal call is rejected with 409, before any Deriv network call", async () => {
+  const sessionId = await createSession({ loginid: "RTTEST02", currency: "USD", accessToken: "fake-token", expiresInSeconds: 3600 });
+  try {
+    const cookie = `traderpro_sid=${sessionId}`;
+    const res = await fetch(`${baseUrl}/api/real-trading/buy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ symbol: "R_100", direction: "rise", stake: 10, duration: 5, proposalId: "p1", price: 10 }),
+    });
+    assert.equal(res.status, 409);
+  } finally {
+    await destroySession(sessionId);
+  }
+});

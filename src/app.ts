@@ -134,13 +134,6 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
       return;
     }
     const { data: rawAccounts } = await accountsRes.json();
-    // Temporary diagnostic: the deployed account only ever got one account
-    // back from /accounts (no demo alongside the real one), which doesn't
-    // match Deriv's own template's assumption that a login typically
-    // covers more than one. Logging the raw shape (never the access token)
-    // to Render's logs on the next real login to see what Deriv actually
-    // sent -- remove once that's explained.
-    console.log("Deriv /accounts response for this login:", JSON.stringify(rawAccounts));
     // CONFIRMED against Deriv's own official App Builder template source
     // (packages/core/src/types/auth.ts's DerivAccount interface): each
     // account's identifier field is `account_id` (not `loginid`/`login_id`/

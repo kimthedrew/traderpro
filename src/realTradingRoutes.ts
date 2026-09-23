@@ -48,19 +48,35 @@ function validateTradeInput(body: any): TradeInput | null {
   return { symbol, direction: direction as RiseFallDirection, stake, duration };
 }
 
-// UNCONFIRMED: whether one OTP'd socket supports a full proposal -> buy
-// exchange or only a single request/response. This assumes the former --
-// one fresh OTP fetch + connection per trade-placement *attempt* (not
-// cached/reused across separate HTTP requests). Verify on first live test
-// against a real account -- see README "Real Trading".
-async function withAuthenticatedClient<T>(accessToken: string, accountId: string, fn: (client: AuthenticatedDerivClient) => Promise<T>): Promise<T> {
-  const wsUrl = await fetchTradingSocketUrl(accessToken, accountId);
-  const client = new AuthenticatedDerivClient(wsUrl);
-  try {
-    await client.connect();
-    return await fn(client);
-  } finally {
-    client.close();
+// CONFIRMED live against a real account: a proposal is only valid on the
+// WebSocket connection it was requested on -- buying it from a fresh
+// connection (even with a valid proposalId/price) fails with Deriv's
+// InvalidContractProposal / "Unknown contract proposal". So the connection
+// opened for /proposal has to stay open and get reused by /buy, not be
+// closed and reopened per HTTP request the way this used to work.
+//
+// Kept in memory, keyed by loginid -- fine for this app's single Node
+// process (Render's free tier runs one instance, no clustering); would
+// need moving to a shared store if this ever runs across multiple
+// processes/instances.
+type PendingProposal = {
+  client: AuthenticatedDerivClient;
+  proposalId: string;
+  askPrice: number;
+  createdAt: number;
+};
+const pendingProposals = new Map<string, PendingProposal>();
+// Deriv's own proposal streams are typically quoted for a few seconds at a
+// time; this isn't a confirmed Deriv-side expiry, just a conservative
+// upper bound so a connection can't sit open indefinitely if a user gets a
+// price and never acts on it.
+const PROPOSAL_TTL_MS = 60_000;
+
+function clearPendingProposal(loginid: string) {
+  const existing = pendingProposals.get(loginid);
+  if (existing) {
+    existing.client.close();
+    pendingProposals.delete(loginid);
   }
 }
 
@@ -78,12 +94,25 @@ realTradingRouter.post("/proposal", async (req, res) => {
       res.status(401).json({ error: "Not logged in" });
       return;
     }
-    const result = await withAuthenticatedClient(session.accessToken, loginid, async (client) => {
+    // A repeated "Get price" click (new symbol/direction/stake) supersedes
+    // whatever proposal this user had pending -- don't leak the old socket.
+    clearPendingProposal(loginid);
+
+    const wsUrl = await fetchTradingSocketUrl(session.accessToken, loginid);
+    const client = new AuthenticatedDerivClient(wsUrl);
+    await client.connect();
+    let result;
+    try {
       const msg = await client.send(
         buildProposalRequest({ symbol: input.symbol, direction: input.direction, stake: input.stake, duration: input.duration, durationUnit: "t", currency: session.currency }),
       );
-      return parseProposalResponse(msg);
-    });
+      result = parseProposalResponse(msg);
+    } catch (err) {
+      client.close();
+      throw err;
+    }
+
+    pendingProposals.set(loginid, { client, proposalId: result.proposalId, askPrice: result.askPrice, createdAt: Date.now() });
     res.json(result);
   } catch (err) {
     console.error("Could not get a Deriv price proposal:", err);
@@ -100,15 +129,36 @@ realTradingRouter.post("/buy", async (req, res) => {
     res.status(400).json({ error: "Invalid trade input" });
     return;
   }
+
+  const pending = pendingProposals.get(loginid);
+  if (!pending || Date.now() - pending.createdAt > PROPOSAL_TTL_MS) {
+    clearPendingProposal(loginid);
+    res.status(409).json({ error: "Price quote expired -- get a new price and try again" });
+    return;
+  }
+  // The client should only ever be echoing back exactly what /proposal
+  // just returned (see trade.js) -- cross-checking against what's actually
+  // pending server-side means a mismatched or fabricated proposalId/price
+  // is rejected here rather than forwarded to Deriv.
+  if (proposalId !== pending.proposalId || price !== pending.askPrice) {
+    res.status(400).json({ error: "Proposal does not match the pending price quote" });
+    return;
+  }
+  // Consumed either way below -- a proposal is single-use once bought (or
+  // attempted), and the socket it lives on isn't reused for anything else.
+  pendingProposals.delete(loginid);
+
   let session;
   try {
     session = await getSession(req.cookies?.[SESSION_COOKIE]);
   } catch (err) {
     console.error("Could not verify session (database unavailable?):", err);
+    pending.client.close();
     res.status(502).json({ error: "Could not verify your session -- try again" });
     return;
   }
   if (!session) {
+    pending.client.close();
     res.status(401).json({ error: "Not logged in" });
     return;
   }
@@ -125,10 +175,8 @@ realTradingRouter.post("/buy", async (req, res) => {
   };
 
   try {
-    const result = await withAuthenticatedClient(session.accessToken, loginid, async (client) => {
-      const msg = await client.send(buildBuyRequest({ proposalId, price }));
-      return parseBuyResponse(msg);
-    });
+    const msg = await pending.client.send(buildBuyRequest({ proposalId, price }));
+    const result = parseBuyResponse(msg);
     const stored = await recordTrade({
       ...tradeBase,
       derivContractId: result.contractId,
@@ -160,6 +208,8 @@ realTradingRouter.post("/buy", async (req, res) => {
       console.error("Could not record failed trade attempt (database unavailable?):", recordErr);
     }
     res.status(502).json({ error: "Could not place trade with Deriv -- try again" });
+  } finally {
+    pending.client.close();
   }
 });
 
