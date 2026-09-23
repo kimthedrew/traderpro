@@ -22,6 +22,7 @@
           </span>
         </div>
         <div class="nav-actions">
+          <a class="btn btn-outline" href="/bots.html">Bots</a>
           <a class="btn btn-outline" id="nav-trade-link" href="/trade.html" hidden>Real Trading</a>
           <button class="btn btn-outline" id="nav-login-btn" type="button">Log In</button>
           <button class="btn btn-solid" id="nav-get-started-btn" type="button">Get Started</button>
@@ -36,6 +37,10 @@
       </div>
     </div>
 
+    <div class="ticker-wrap" id="ticker">
+      <div class="ticker-track" id="ticker-track"></div>
+    </div>
+
     <header class="hero">
       <div class="container hero-grid">
         <div class="hero-copy">
@@ -43,7 +48,7 @@
           <p>Connect your own Deriv account and trade with an edge. We never touch your funds — everything executes on the account you already control.</p>
           <div class="hero-actions">
             <button class="btn btn-solid btn-lg" id="hero-login-btn" type="button">Log In with Deriv</button>
-            <a class="btn btn-outline btn-lg" href="#ticker">See live prices</a>
+            <a class="btn btn-outline btn-lg" href="#signals-heading">See Signals</a>
           </div>
         </div>
         <div class="hero-visual" id="hero-visual">
@@ -53,14 +58,10 @@
       </div>
     </header>
 
-    <div class="ticker-wrap" id="ticker">
-      <div class="ticker-track" id="ticker-track"></div>
-    </div>
-
     <section class="signals">
       <div class="container">
         <p class="section-label">Live</p>
-        <h2>Signals</h2>
+        <h2 id="signals-heading">Signals</h2>
         <p class="signals-sub">Automatic alerts when a symbol moves &plusmn;1% within 5 minutes. No account needed to watch.</p>
         <div class="signals-list" id="signals-list">
           <p class="signals-empty" id="signals-empty">Watching the market — signals will appear here as they trigger.</p>

@@ -122,3 +122,9 @@ initNavAuth([navLoginBtn]).then((session) => {
   loggedIn.hidden = !session.loggedIn;
   if (session.loggedIn) loadBots();
 });
+
+// Real Trading is feature-flagged server-side -- this only shows/hides the
+// nav link, the backend 404s the routes when it's off. See src/app.ts.
+loadOAuthConfig().then((config) => {
+  if (config.realTradingEnabled) document.getElementById("nav-trade-link").hidden = false;
+});
