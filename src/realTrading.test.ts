@@ -17,12 +17,12 @@ test("buildProposalRequest produces the expected Deriv request shape", () => {
     currency: "USD",
     duration: 5,
     duration_unit: "t",
-    symbol: "R_100",
+    underlying_symbol: "R_100",
   });
 });
 
-test("buildBuyRequest produces the expected Deriv request shape", () => {
-  assert.deepEqual(buildBuyRequest({ proposalId: "abc123", price: 10.5 }), { buy: "abc123", price: 10.5 });
+test("buildBuyRequest produces the expected Deriv request shape, with price as a string", () => {
+  assert.deepEqual(buildBuyRequest({ proposalId: "abc123", price: 10.5 }), { buy: "abc123", price: "10.5" });
 });
 
 test("parseProposalResponse extracts fields from a well-formed message", () => {

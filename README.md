@@ -320,27 +320,54 @@ own). Both routes fetch a fresh, short-lived OTP'd WebSocket URL per
 attempt (`src/derivAuthClient.ts`) and open an authenticated connection
 scoped to that one proposal→buy exchange, then close it.
 
-**What's confirmed vs. not**, same honesty this project has applied to
-every other Deriv integration point before it's been tested live:
+**What's confirmed vs. not.** Deriv publishes an official no-code App
+Builder (`developers.deriv.com/dashboard/builder/`) whose generated
+templates include real, working source for this exact flow — reading that
+source (not just its docs) resolved several items that were previously
+just educated guesses, and caught two real bugs in the process:
 
-- **Unconfirmed**: whether the OTP endpoint's `accountId` path segment is
-  the same value as `loginid` (assumed yes, consistent with how the rest
-  of the app already treats `loginid` as canonical).
-- **Unconfirmed**: whether one OTP'd socket supports a full proposal→buy
-  exchange, or only a single request (assumed the former).
-- **Unconfirmed**: the exact proposal/buy request+response field names,
-  and what a proposal-expired buy failure actually looks like on the wire.
-- **Unconfirmed**: whether `contract_id`/`transaction_id` need
-  precision-safe JSON parsing — Deriv's own ids aren't confirmed to stay
-  under `Number.MAX_SAFE_INTEGER` the way regular Postgres ids do (see
-  Persistence below for the related, already-fixed CockroachDB id issue —
-  this is a *new*, still-open instance of the same bug class).
-- **Unconfirmed**: real per-symbol min/max tick durations — `[5, 10]`
-  ticks is a deliberate scope-reduction guess for v1, not a discovered
-  Deriv constraint (see `TRADING_ROADMAP.md`).
-- **Unconfirmed**: whether a failed buy call can ever partially charge the
-  account. `POST /buy` records the trade attempt either way (`status:
-  "placed"` or `"error"`) so there's always an audit trail.
+- **Fixed, confirmed via Deriv's own template source**: `POST
+  /api/session`'s account-id extraction was wrong — it guessed
+  `loginid`/`login_id`/`id` as the `/accounts` response's identifier
+  field, but the real field is `account_id` (none of the guessed names
+  exist on the actual response). Every login was silently falling through
+  to the `"account"` fallback, meaning every logged-in user collided on
+  the same `users.loginid` row. Now reads `account.account_id`.
+  `account_id` also turns out to be the *same* value the OTP endpoint's
+  `{accountId}` path segment wants — Deriv's API has only one identifier
+  concept here, not two to reconcile.
+- **Fixed, confirmed via Deriv's own template source**: the OTP endpoint's
+  response is `{ data: { url } }`, not a bare `{ url }` — the previous
+  fallback chain (`body.url ?? body.websocket_url ?? body.otp_url`) would
+  never have matched the real shape.
+- **Fixed, confirmed via Deriv's own template source**: the proposal
+  request's symbol field is `underlying_symbol`, not `symbol` — every
+  proposal call would have failed. The buy request's `price` must be sent
+  as a string, not a number.
+- **Confirmed, no change needed**: the rest of the proposal/buy field
+  names (`ask_price`, `payout`, `spot`, `contract_id`, `transaction_id`,
+  `buy_price`, `longcode`) already matched what this app expected.
+  `CALL`/`PUT` for Rise/Fall is also confirmed correct.
+- **Lowered risk, not fully closed**: Deriv's own TypeScript types
+  `contract_id`/`transaction_id` as `number`, which suggests they likely
+  stay within JS's safe integer range in practice — the precision-loss
+  risk flagged under Persistence below is real in principle but less
+  likely to bite than it looked before. Still coerced to `String()`
+  regardless, since that costs nothing either way.
+- **Still unconfirmed, needs a real account**: whether one OTP'd socket
+  supports a full proposal→buy exchange or only a single request (this
+  app assumes the former); what a proposal-expired buy failure actually
+  looks like on the wire; whether a failed buy call can ever partially
+  charge the account (`POST /buy` records the attempt either way —
+  `status: "placed"` or `"error"` — so there's always an audit trail);
+  real per-symbol min/max tick durations (`[5, 10]` is a deliberate
+  scope-reduction guess, not a discovered constraint).
+- **Confirmed as a real gap, not built**: Deriv's own template keeps the
+  proposal *subscribed* (`subscribe: 1`), showing a live-updating payout
+  directly on the Buy button; this app does a one-shot request per "Get
+  price" click instead. Also confirmed: Deriv's Rise/Fall template has an
+  "Allow equals" toggle (`CALLE`/`PUTE` contract types) this app doesn't
+  offer. Both tracked in `TRADING_ROADMAP.md` as deferred follow-ups.
 
 Only Rise/Fall is supported — see `TRADING_ROADMAP.md` for what each other
 Deriv contract type (Multipliers, Touch/No Touch, Higher/Lower,

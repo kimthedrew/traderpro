@@ -5,8 +5,11 @@
 //
 // Pure request-building/response-parsing logic lives here, no I/O -- same
 // split as botBuilder.ts (matchesBot/buildPaperTrade vs botBuilderStore.ts).
-// Every Deriv message shape below is documented but UNCONFIRMED against a
-// real account -- see README "Real Trading" before trusting it in prod.
+// Request/response shapes below are cross-checked against Deriv's own
+// official App Builder template source (packages/core/src/types/trading.ts
+// and react/useProposal.ts/useBuy.ts) -- confirmed by reading Deriv's own
+// code, not yet by a live trade against a real account. See README "Real
+// Trading" for what that last step still needs.
 
 export type RiseFallDirection = "rise" | "fall";
 
@@ -31,9 +34,10 @@ export type RealTrade = {
   errorMessage: string | null;
 };
 
-// Deriv's stable CALL/PUT naming for Rise/Fall contracts (per Deriv's public
-// API docs) -- not yet confirmed against this app's own authenticated
-// trading channel.
+// CALL/PUT for plain Rise/Fall -- confirmed directly in Deriv's own
+// rise-fall template (hooks/use-rise-fall-trading.ts). The "Allow equals"
+// variant that template also offers appends "E" (CALLE/PUTE), not built
+// here -- see TRADING_ROADMAP.md.
 export function contractTypeForDirection(direction: RiseFallDirection): "CALL" | "PUT" {
   return direction === "rise" ? "CALL" : "PUT";
 }
@@ -54,15 +58,20 @@ export function buildProposalRequest(input: {
     currency: input.currency,
     duration: input.duration,
     duration_unit: input.durationUnit,
-    symbol: input.symbol,
+    // CONFIRMED field name via Deriv's own template (react/useProposal.ts):
+    // Deriv's proposal request takes `underlying_symbol`, not `symbol` --
+    // this was wrong before and would have made every proposal call fail.
+    underlying_symbol: input.symbol,
   };
 }
 
 export type ProposalResult = { proposalId: string; askPrice: number; payout: number; spot: number };
 
-// UNCONFIRMED response shape -- based on Deriv's documented proposal message
-// (proposal.{id,ask_price,payout,spot}), never verified against a real
-// response from this app's own OTP'd channel.
+// Response shape confirmed against Deriv's own ProposalResponse type
+// (proposal.{id,ask_price,payout,spot,...}) -- matches what was already
+// here. Deriv's own template additionally uses `subscribe: 1` to keep this
+// streaming live rather than a one-shot call; this app still does a single
+// request per "Get price" click -- see TRADING_ROADMAP.md.
 export function parseProposalResponse(msg: any): ProposalResult {
   const p = msg?.proposal;
   if (!p || (typeof p.id !== "string" && typeof p.id !== "number")) {
@@ -72,16 +81,20 @@ export function parseProposalResponse(msg: any): ProposalResult {
 }
 
 export function buildBuyRequest(input: { proposalId: string; price: number }): Record<string, unknown> {
-  return { buy: input.proposalId, price: input.price };
+  // CONFIRMED via Deriv's own template (react/useBuy.ts): `price` is sent
+  // as a string, not a number -- this was wrong before.
+  return { buy: input.proposalId, price: String(input.price) };
 }
 
 export type BuyResult = { contractId: string; transactionId: string; buyPrice: number; payout: number; longcode: string };
 
-// Same UNCONFIRMED-shape caveat as parseProposalResponse. contract_id /
-// transaction_id are coerced to String() immediately -- but that coercion
-// happens *after* JSON.parse, so it can't recover precision already lost
-// there if Deriv's own ids ever exceed Number.MAX_SAFE_INTEGER (unconfirmed
-// either way -- see README "Real Trading").
+// Field names confirmed against Deriv's own BuyResponse type (buy.{contract_id,
+// transaction_id,buy_price,payout,longcode,balance_after,...}) -- matches
+// what was already here. Deriv's own TypeScript types contract_id/
+// transaction_id as `number`, which meaningfully lowers (but doesn't fully
+// rule out) the JSON.parse precision-loss risk flagged in README/db.ts --
+// still coerced to String() here regardless, since that's free and correct
+// either way.
 export function parseBuyResponse(msg: any): BuyResult {
   const b = msg?.buy;
   if (!b || (typeof b.contract_id !== "string" && typeof b.contract_id !== "number")) {

@@ -12,11 +12,10 @@ type PendingRequest = {
 // Never sent to the browser -- called server-side only, same as the
 // /accounts fetch in app.ts's /api/session handler.
 //
-// UNCONFIRMED: whether `accountId` here is the same value as `loginid`
-// (assumed yes -- the rest of this app already treats loginid as the
-// account's canonical identifier). If a real OTP call rejects with loginid
-// as the path segment, Session needs a distinct account id stored alongside
-// it (see sessionStore.ts).
+// CONFIRMED against Deriv's own official App Builder template source:
+// `accountId` here is the same value app.ts now stores as `loginid`
+// (Deriv's /accounts response only has one identifier field, `account_id`
+// -- there's no separate "loginid" concept to reconcile, see app.ts).
 export async function fetchTradingSocketUrl(accessToken: string, accountId: string): Promise<string> {
   const res = await fetch(`${DERIV_API_BASE}/trading/v1/options/accounts/${accountId}/otp`, {
     method: "POST",
@@ -27,9 +26,10 @@ export async function fetchTradingSocketUrl(accessToken: string, accountId: stri
     throw new Error(`Deriv OTP request failed: HTTP ${res.status} ${body}`);
   }
   const body = await res.json();
-  // UNCONFIRMED field name -- falling back across the likely variants, same
-  // approach app.ts already takes for the /accounts response's loginid field.
-  const url = body.url ?? body.websocket_url ?? body.otp_url;
+  // CONFIRMED shape (Deriv's OTPResponse type): { data: { url } }, wrapped
+  // in `data` like every other Deriv REST response here -- not a bare
+  // { url } at the top level as previously guessed.
+  const url = body.data?.url;
   if (typeof url !== "string" || !url) {
     throw new Error("Deriv OTP response did not include a usable WebSocket URL");
   }

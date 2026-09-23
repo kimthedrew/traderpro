@@ -135,9 +135,17 @@ app.post("/api/session", sessionLimiter, async (req, res) => {
     }
     const { data: accounts } = await accountsRes.json();
     const account = accounts?.[0] ?? {};
-    // Exact field names aren't confirmed against a real login yet -- fall
-    // back gracefully across the likely variants instead of assuming one.
-    const loginid = account.loginid ?? account.login_id ?? account.id ?? "account";
+    // CONFIRMED against Deriv's own official App Builder template source
+    // (packages/core/src/types/auth.ts's DerivAccount interface): the
+    // /accounts response's account identifier field is `account_id`, not
+    // `loginid`/`login_id`/`id` -- none of those exist on the real response.
+    // This was silently wrong before: every login fell through to the
+    // "account" fallback, meaning every user collided on the same
+    // users.loginid row. account_id doubles as the OTP endpoint's
+    // {accountId} path param too (see derivAuthClient.ts), so this one
+    // field is both our internal "loginid" and Deriv's real identifier --
+    // there's no separate concept to reconcile.
+    const loginid = account.account_id ?? account.loginid ?? "account";
     const currency = account.currency ?? "";
 
     // Deriv's docs show a 3600s (1h) access token lifetime; fall back to
