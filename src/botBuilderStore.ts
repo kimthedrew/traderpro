@@ -1,6 +1,8 @@
 import { pool } from "./db.js";
 import { matchesBot, buildPaperTrade, type Bot, type BotDirection, type PaperTrade } from "./botBuilder.js";
 import type { SignalEvent } from "./signals.js";
+import { BOT_TRADING_ENABLED, BOT_TRADE_DURATION_TICKS, type BotTradeConfirmation } from "./botTrading.js";
+import { createPendingConfirmation } from "./botTradingStore.js";
 
 // id comes back from Postgres/CockroachDB as a string (BIGSERIAL/BIGINT
 // columns are returned as strings by pg, to avoid precision loss on values
@@ -70,15 +72,24 @@ async function recordPaperTrade(trade: PaperTrade): Promise<void> {
   );
 }
 
-// Wires a fired signal to every matching bot's paper-trade log. Nothing
-// here calls Deriv's trade API -- see botBuilder.ts.
-export async function runBotsForSignal(signal: SignalEvent): Promise<void> {
+// Wires a fired signal to every matching bot's paper-trade log, and (only
+// when BOT_TRADING_ENABLED) creates a pending trade confirmation too --
+// this never calls Deriv's trade API itself, it just queues something a
+// human can confirm; see botTradingRoutes.ts for where the actual Deriv
+// call happens, and botTrading.ts for why. Returns the confirmations
+// created so the caller (server.ts) can broadcast them live.
+export async function runBotsForSignal(signal: SignalEvent): Promise<BotTradeConfirmation[]> {
   const candidates = await getEnabledBotsForSymbol(signal.symbol);
+  const created: BotTradeConfirmation[] = [];
   for (const bot of candidates) {
     if (matchesBot(bot, signal)) {
       await recordPaperTrade(buildPaperTrade(bot, signal));
+      if (BOT_TRADING_ENABLED) {
+        created.push(await createPendingConfirmation(bot, signal, BOT_TRADE_DURATION_TICKS));
+      }
     }
   }
+  return created;
 }
 
 export type StoredPaperTrade = PaperTrade & { createdAt: string };

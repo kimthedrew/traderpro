@@ -69,3 +69,9 @@ test("real-trading routes 404 when ENABLE_REAL_TRADING is not set", async () => 
   const res = await fetch(`${baseUrl}/api/real-trading/trades`);
   assert.equal(res.status, 404);
 });
+
+// Same reasoning as above -- ENABLE_BOT_TRADING is also unset here.
+test("bot-trading routes 404 when ENABLE_BOT_TRADING is not set", async () => {
+  const res = await fetch(`${baseUrl}/api/bot-trading/pending`);
+  assert.equal(res.status, 404);
+});

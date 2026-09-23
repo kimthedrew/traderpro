@@ -10,6 +10,12 @@ const botNameInput = document.getElementById("bot-name");
 const botCreateStatus = document.getElementById("bot-create-status");
 const botsList = document.getElementById("bots-list");
 const botsEmpty = document.getElementById("bots-empty");
+const botsPendingCard = document.getElementById("bots-pending-card");
+const botsPendingList = document.getElementById("bots-pending-list");
+const botsPendingEmpty = document.getElementById("bots-pending-empty");
+
+let currency = "";
+let myLoginid = null;
 
 Object.entries(SYMBOL_NAMES).forEach(([value, label]) => {
   const opt = document.createElement("option");
@@ -93,6 +99,57 @@ async function loadBots() {
   }
 }
 
+// ---- Pending trade confirmations (Bot Builder active mode) ----
+function buildPendingConfirmation(confirmation) {
+  const el = document.createElement("div");
+  el.className = "pending-confirmation";
+  const up = confirmation.direction === "up";
+  el.innerHTML = `
+    <span class="pc-dir ${up ? "up" : "down"}">${up ? "▲" : "▼"}</span>
+    <div class="pc-main">
+      <div class="pc-bot">${confirmation.botName}</div>
+      <div class="pc-meta">${SYMBOL_NAMES[confirmation.symbol] ?? confirmation.symbol} &middot; ${confirmation.stake.toFixed(2)} ${currency} &middot; Signal ${confirmation.signalChangePct.toFixed(2)}% @ ${confirmation.signalPrice.toFixed(2)}</div>
+    </div>
+    <div class="pc-actions">
+      <button type="button" class="btn btn-outline btn-sm pc-reject">Reject</button>
+      <button type="button" class="btn btn-warn btn-sm pc-confirm">Confirm — real money</button>
+    </div>
+  `;
+
+  el.querySelector(".pc-reject").addEventListener("click", async () => {
+    el.querySelectorAll("button").forEach((b) => (b.disabled = true));
+    await fetch(`/api/bot-trading/confirmations/${confirmation.id}/reject`, { method: "POST" });
+    el.remove();
+    botsPendingEmpty.hidden = botsPendingList.children.length > 0;
+  });
+
+  el.querySelector(".pc-confirm").addEventListener("click", async () => {
+    el.querySelectorAll("button").forEach((b) => (b.disabled = true));
+    const res = await fetch(`/api/bot-trading/confirmations/${confirmation.id}/confirm`, { method: "POST" });
+    if (res.ok) {
+      el.remove();
+      botsPendingEmpty.hidden = botsPendingList.children.length > 0;
+    } else {
+      el.querySelectorAll("button").forEach((b) => (b.disabled = false));
+      el.querySelector(".pc-meta").textContent += " — couldn't place trade, try again.";
+    }
+  });
+
+  return el;
+}
+
+function prependPendingConfirmation(confirmation) {
+  botsPendingEmpty.hidden = true;
+  botsPendingList.prepend(buildPendingConfirmation(confirmation));
+}
+
+async function loadPendingConfirmations() {
+  const { confirmations } = await fetch("/api/bot-trading/pending").then((r) => r.json());
+  botsPendingList.innerHTML = "";
+  botsPendingEmpty.hidden = confirmations.length > 0;
+  confirmations.forEach((c) => botsPendingList.append(buildPendingConfirmation(c)));
+}
+
 botForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   botCreateStatus.textContent = "Creating...";
@@ -121,11 +178,40 @@ initNavAuth([navLoginBtn]).then((session) => {
   loggedOut.hidden = session.loggedIn;
   loggedIn.hidden = !session.loggedIn;
   renderAccountBadge(document.getElementById("nav-account"), session);
-  if (session.loggedIn) loadBots();
+  currency = session.currency ?? "";
+  myLoginid = session.loggedIn ? session.loginid : null;
+  if (session.loggedIn) {
+    loadBots();
+    loadPendingConfirmations();
+  }
 });
 
-// Real Trading is feature-flagged server-side -- this only shows/hides the
-// nav link, the backend 404s the routes when it's off. See src/app.ts.
+// Real Trading / Bot Builder active mode are feature-flagged server-side --
+// this only shows/hides UI, the backend 404s the routes when they're off.
+// See src/app.ts.
 loadOAuthConfig().then((config) => {
   if (config.realTradingEnabled) document.getElementById("nav-trade-link").hidden = false;
+  if (config.botTradingEnabled) {
+    document.getElementById("bots-money-banner").hidden = false;
+    document.getElementById("bots-pending-card").hidden = false;
+    document.getElementById("bots-section-label").textContent = "Active — confirm each trade";
+    document.getElementById("bots-sub").innerHTML =
+      'Build a simple rule that watches Signals. <strong>A matching Signal queues a real trade</strong> that only places once you confirm it below — see the Terms of Service.';
+    document.getElementById("bots-disclaimer-text").innerHTML =
+      '<strong>Risk disclaimer.</strong> Deriv offers complex derivatives, such as options and contracts for difference ("CFDs"). These products may not be suitable for all clients, and trading them puts you at risk. You may lose some or all of the money you invest in a trade. Never trade with money you cannot afford to lose. <strong>Bots can place real trades on your account once you confirm them.</strong> This feature has not yet been reviewed by legal counsel — see the Terms of Service.';
+  }
+});
+
+// Live confirmations, pushed the moment a bot's rule matches a Signal --
+// reuses the same SSE stream /api/stream already carries ticks/signals
+// over, but targeted server-side to this user's own connection only (see
+// src/app.ts's broadcastToUser) -- unlike ticks/signals, this isn't public
+// data. The ownerLoginid check below is defense in depth, not the real
+// boundary; that's enforced server-side.
+const botConfirmationStream = new EventSource("/api/stream");
+botConfirmationStream.addEventListener("bot-confirmation-pending", (event) => {
+  if (loggedIn.hidden) return; // not logged in (or session not resolved yet) -- nothing to show it in
+  const confirmation = JSON.parse(event.data);
+  if (confirmation.ownerLoginid !== myLoginid) return;
+  prependPendingConfirmation(confirmation);
 });

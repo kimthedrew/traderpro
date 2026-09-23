@@ -1,11 +1,12 @@
 # traderpro
 
 Deriv third-party trading app. Live market-data feed, Deriv OAuth2 login,
-Signals (live), Copy Trading + Bot Builder (both real, both deliberately
-shadow/paper-mode-only — see their sections below for why), and Real
-Trading (Rise/Fall) — the first feature here that places a real trade with
-real money, feature-flagged off by default pending legal review (see its
-section below).
+Signals (live), Copy Trading (still shadow-mode-only — see its section
+below for why), Real Trading (Rise/Fall) — the first feature here that
+places a real trade with real money, feature-flagged off by default
+pending legal review — and Bot Builder, whose "active" mode places a real
+trade too, but only once a human explicitly confirms each one (see both
+sections below).
 
 Deriv migrated their API in 2026 to a REST + OAuth2/PKCE model (from the
 older single-WebSocket, `?app_id=` query-param API many older examples
@@ -52,6 +53,12 @@ still reference). This project is built against the current API.
   / `src/authHelpers.ts` hold the small pieces (`APP_ID`, `DERIV_API_BASE`,
   `requireLogin`, `currentLoginId`) both `app.ts` and this route module
   need, without the route module importing back into `app.ts`.
+- `src/botTrading.ts` / `src/botTradingStore.ts` / `src/botTradingRoutes.ts`
+  &mdash; Bot Builder's "active" mode: a fired bot rule creates a pending
+  trade confirmation here, and confirming it reuses `realTrading.ts`'s
+  request-building and `derivAuthClient.ts`'s connection to place the
+  actual trade — mounted only when `ENABLE_BOT_TRADING=true` (see Bot
+  Builder below).
 
 ## Setup
 
@@ -296,14 +303,12 @@ work (see Next steps) before that switch gets thrown.
 
 ## Bot Builder
 
-**Paper mode only — no real trade is ever placed.** The third and last
-roadmap item, and the riskiest one if it were live: a bot is a no-code
-rule ("when a Signal fires for [symbol] in [direction], paper-trade
-[$stake]") that reuses Signal detection rather than a second condition
-engine (`src/botBuilder.ts`). Unlike Copy Trading's one-row-per-user
-config, bots are full CRUD resources — any logged-in user can create,
-enable/disable, edit the stake on, or delete multiple bots
-(`/api/bots`, own page at `/bots.html`), and every mutating/reading
+A bot is a no-code rule ("when a Signal fires for [symbol] in [direction],
+trade [$stake]") that reuses Signal detection rather than a second
+condition engine (`src/botBuilder.ts`). Unlike Copy Trading's
+one-row-per-user config, bots are full CRUD resources — any logged-in
+user can create, enable/disable, edit the stake on, or delete multiple
+bots (`/api/bots`, own page at `/bots.html`), and every mutating/reading
 endpoint scopes by owner in the query itself (`WHERE ... AND
 owner_loginid = $2`), not just a check beforehand, so one user can't
 touch another's bot by guessing its id. `PATCH /api/bots/:id` is a real
@@ -312,13 +317,42 @@ require and overwrite both `enabled` and `stake` together, so toggling a
 bot on/off from a page with a stale cached stake value could silently
 revert a stake edit made in another tab.
 
-There's deliberately no path from paper mode to live trading yet, unlike
-Copy Trading which at least has `COPY_TRADING_LEADER_LOGINID` wired up
-for when detection is ready. A bot placing real, unsupervised trades from
-an arbitrary user-defined rule is a materially bigger risk than mirroring
-a single known leader's activity — that switch needs its own explicit
-design discussion, not just a config flag, whenever it's actually on the
-table.
+**Always** logs a paper trade when a rule matches (`bot_paper_trades`) —
+that never stopped happening. **Additionally**, when `ENABLE_BOT_TRADING`
+is on (and it requires `ENABLE_REAL_TRADING` too — see `.env.example`), a
+matching rule creates a *pending trade confirmation* instead of executing
+anything automatically. This is a deliberate middle ground, not full
+automation: a bot placing real, unsupervised trades the instant a rule
+matches was judged too much risk (a bug in a rule, or a burst of Signals
+in a volatile moment, could place many real trades with nobody watching)
+— so a human has to explicitly hit **Confirm** on `bots.html` before any
+money moves, the same way Real Trading requires reviewing a price before
+buying. Confirming fetches a fresh proposal and buys it immediately over
+one connection (`src/botTradingRoutes.ts`), reusing the exact same Deriv
+execution code Real Trading uses (`realTrading.ts`, `derivAuthClient.ts`,
+`realTradingStore.ts`) — a bot-confirmed trade lands in the same
+`real_trades` table as a manually-placed one, same audit trail, same
+`REAL_TRADING_MAX_STAKE` cap re-checked at confirm time (not just at bot
+creation, since the cap can change after a bot already exists).
+
+Pending confirmations expire after 5 minutes
+(`PENDING_CONFIRMATION_TTL_MS`, `src/botTrading.ts`) — a Signal is a
+snapshot of a moment that's already passed by the time a human notices
+and reacts, so an old one isn't a meaningful trade opportunity anymore.
+They're pushed live to `bots.html` over the same SSE connection ticks use
+(`event: bot-confirmation-pending`), but — unlike ticks/signals, which
+are genuinely public — targeted server-side to just that confirmation's
+owner (`broadcastToUser` in `app.ts`, which maps each SSE connection to
+the loginid resolved from its session cookie) rather than fanned out to
+every connected client the way `broadcast()` is; a user's bot name,
+stake, and direction aren't public data.
+
+Bots don't have a duration field yet — every bot-confirmed trade uses a
+fixed 5-tick duration (`BOT_TRADE_DURATION_TICKS`), the same
+deliberate-scope-reduction reasoning as Real Trading's own fixed `[5,
+10]` set. A per-bot duration, and the fully-automated (no confirmation)
+mode this deliberately isn't, are both reasonable follow-ups once this
+has been used for a while — not required for what's here to be safe.
 
 ## Real Trading
 
@@ -439,13 +473,13 @@ itself. Before relying on them:
   financial-promotion rules for Signals, and whether Copy Trading counts
   as regulated investment advice/portfolio management in a given
   jurisdiction even in shadow mode, and especially once live).
-- **Real Trading already exists in the codebase now**, behind
-  `ENABLE_REAL_TRADING` (off by default) — precisely *because* this
-  review hasn't happened yet. Unlike Copy Trading/Bot Builder's "shadow
-  mode until legal review, then a deliberate switch," this feature's real
-  trade-execution code is already written and flag-gated; flipping the
-  flag on in production without doing this review first is exactly the
-  scenario the flag exists to prevent.
+- **Real Trading and Bot Builder's active mode already exist in the
+  codebase now**, both behind flags (`ENABLE_REAL_TRADING`,
+  `ENABLE_BOT_TRADING`) — precisely *because* this review hasn't happened
+  yet. Unlike Copy Trading's "shadow mode until legal review, then a
+  deliberate switch," this real trade-execution code is already written
+  and flag-gated; flipping either flag on in production without doing
+  this review first is exactly the scenario they exist to prevent.
 - A real contact address/email (both docs have a placeholder).
 - Governing law and limitation-of-liability language (both explicitly
   stubbed out, `[in brackets]`, in `terms.html`).
@@ -463,10 +497,12 @@ itself. Before relying on them:
   instead of shadow-logging them.
 - Legal: get the draft ToS/privacy policy in front of real counsel (see
   Legal above) before charging anyone money, and specifically before
-  Copy Trading or Bot Builder go from shadow/paper mode to live.
-- Bot Builder: real trade execution is intentionally undesigned — needs
-  its own explicit design pass (not just a flag) once legal groundwork
-  and Copy Trading's live-detection piece are both further along.
+  Copy Trading goes from shadow mode to live, or Real Trading/Bot
+  Builder's active mode go from flag-gated testing to a real launch.
+- Bot Builder: a per-bot duration field (every bot-confirmed trade is
+  fixed at 5 ticks for now), and a fully-automated (no per-trade
+  confirmation) mode — deliberately not built, see Bot Builder above for
+  why; would need its own explicit risk/design discussion, not just a flag.
 - Confirm the `/accounts` response field names (see OAuth2 + PKCE flow
   above) against a real login.
 - Real Trading: everything under "What's confirmed vs. not" in the Real

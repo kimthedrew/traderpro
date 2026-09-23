@@ -32,15 +32,26 @@
     </nav>
 
     <main class="container bots-page">
-      <p class="section-label">Preview &mdash; paper mode</p>
+      <p class="section-label" id="bots-section-label">Preview &mdash; paper mode</p>
       <h1>Bot Builder</h1>
-      <p class="bots-sub">Build a simple rule that watches Signals and paper-trades against them. <strong>No real trade is ever placed by this feature yet</strong> — see the Terms of Service.</p>
+      <p class="bots-sub" id="bots-sub">Build a simple rule that watches Signals and paper-trades against them. <strong>No real trade is ever placed by this feature yet</strong> — see the Terms of Service.</p>
+
+      <div class="real-money-banner" id="bots-money-banner" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L14.7 3.86a2 2 0 00-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <p><strong>Bots can place real trades now</strong> — but only after you confirm each one. A matching Signal queues a trade below; nothing executes until you approve it. This feature has not yet been through legal/compliance review.</p>
+      </div>
 
       <div class="ct-card" id="bots-logged-out">
         <p>Log in with Deriv to build bots.</p>
       </div>
 
       <div id="bots-logged-in" hidden>
+        <div class="ct-card" id="bots-pending-card" hidden>
+          <h2 class="bots-form-title">Pending trade confirmations</h2>
+          <div id="bots-pending-list"></div>
+          <p class="ct-status" id="bots-pending-empty">No pending confirmations.</p>
+        </div>
+
         <div class="ct-card">
           <h2 class="bots-form-title">New bot</h2>
           <form class="bot-form" id="bot-form">
@@ -74,7 +85,7 @@
       <div class="container">
         <div class="disclaimer">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L14.7 3.86a2 2 0 00-3.4 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <p><strong>Risk disclaimer.</strong> Deriv offers complex derivatives, such as options and contracts for difference ("CFDs"). These products may not be suitable for all clients, and trading them puts you at risk. You may lose some or all of the money you invest in a trade. Never trade with money you cannot afford to lose. Bot Builder is currently in paper mode — no real trades are executed by bots yet.</p>
+          <p id="bots-disclaimer-text"><strong>Risk disclaimer.</strong> Deriv offers complex derivatives, such as options and contracts for difference ("CFDs"). These products may not be suitable for all clients, and trading them puts you at risk. You may lose some or all of the money you invest in a trade. Never trade with money you cannot afford to lose. Bot Builder is currently in paper mode — no real trades are executed by bots yet.</p>
         </div>
         <div class="footer-links">
           <a href="/terms.html">Terms of Service</a>

@@ -40,3 +40,28 @@
 
 .bot-trades { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
 .bot-trades .ct-status { margin: 0; }
+
+#bots-pending-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.pending-confirmation {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: var(--surface-raised);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--border));
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+}
+
+.pending-confirmation .pc-dir { flex: none; font-size: 0.9rem; }
+.pending-confirmation .pc-dir.up { color: var(--up); }
+.pending-confirmation .pc-dir.down { color: var(--down); }
+
+.pending-confirmation .pc-main { flex: 1 1 auto; min-width: 160px; }
+.pending-confirmation .pc-bot { font-weight: 600; }
+.pending-confirmation .pc-meta { color: var(--text-muted); font-size: 0.78rem; }
+
+.pending-confirmation .pc-actions { display: flex; gap: 0.5rem; flex: none; }
+.pending-confirmation .btn-sm { padding: 0.4rem 0.75rem; font-size: 0.8rem; }

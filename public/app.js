@@ -142,13 +142,21 @@ initNavAuth([navLoginBtn, navGetStartedBtn, heroLoginBtn]).then((session) => {
   renderAccountBadge(document.getElementById("nav-account"), session);
 });
 
-// Real Trading is feature-flagged server-side (ENABLE_REAL_TRADING) -- this
-// is only a UI hide/show, the actual gate is the backend 404ing the routes
-// when it's off. See src/app.ts.
+// Real Trading / Bot Builder active mode are feature-flagged server-side --
+// this is only a UI hide/show, the actual gate is the backend 404ing the
+// routes when they're off. See src/app.ts.
 loadOAuthConfig().then((config) => {
-  if (!config.realTradingEnabled) return;
-  document.getElementById("nav-trade-link").hidden = false;
-  document.getElementById("feature-card-real-trading").hidden = false;
+  if (config.realTradingEnabled) {
+    document.getElementById("nav-trade-link").hidden = false;
+    document.getElementById("feature-card-real-trading").hidden = false;
+  }
+  if (config.botTradingEnabled) {
+    document.getElementById("bots-card-status").textContent = "Active";
+    document.getElementById("bots-card-status").className = "status-pill status-live-real";
+    document.getElementById("bots-card-desc").textContent =
+      "A no-code strategy editor for automating your own trades. Places real trades once you confirm each one.";
+    document.getElementById("bots-card-link").textContent = "Try it →";
+  }
 });
 
 // Copy Trading (shadow mode): shows a follower's own settings + what would

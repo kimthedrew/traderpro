@@ -13,6 +13,8 @@ import { TICKER_SYMBOLS } from "./symbols.js";
 import { APP_ID, DERIV_API_BASE } from "./derivConfig.js";
 import { SESSION_COOKIE, requireLogin, currentLoginId } from "./authHelpers.js";
 import { realTradingRouter, MAX_STAKE as REAL_TRADING_MAX_STAKE } from "./realTradingRoutes.js";
+import { botTradingRouter } from "./botTradingRoutes.js";
+import { BOT_TRADING_ENABLED } from "./botTrading.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -90,6 +92,9 @@ app.get("/api/config", (_req, res) => {
     // So the UI can show/enforce the real cap instead of guessing one --
     // the server still re-validates this itself, this is a display hint.
     realTradingMaxStake: REAL_TRADING_MAX_STAKE,
+    // Same frontend-only-hint reasoning as realTradingEnabled -- the real
+    // gate is the router mount below.
+    botTradingEnabled: BOT_TRADING_ENABLED,
   });
 });
 
@@ -427,9 +432,19 @@ if (REAL_TRADING_ENABLED) {
   app.use("/api/real-trading", realTradingRouter);
 }
 
+// Bot Builder "active" mode: same 404-when-off gating, see
+// BOT_TRADING_ENABLED in botTrading.ts (requires REAL_TRADING_ENABLED too).
+if (BOT_TRADING_ENABLED) {
+  app.use("/api/bot-trading", botTradingRouter);
+}
+
 // Relays live ticks from our backend Deriv WebSocket connection to the
 // browser over Server-Sent Events, proving the server <-> Deriv link works.
-const sseClients = new Set<express.Response>();
+// Maps each connection to the loginid it belongs to (null if logged out,
+// or not yet resolved) so non-public events -- e.g. one user's pending bot
+// trade confirmation -- can be sent only to that user's own connections,
+// not fanned out to everyone the way ticks/signals deliberately are.
+const sseClients = new Map<express.Response, string | null>();
 
 app.get("/api/stream", (req, res) => {
   res.set({
@@ -438,7 +453,17 @@ app.get("/api/stream", (req, res) => {
     Connection: "keep-alive",
   });
   res.flushHeaders();
-  sseClients.add(res);
+  // Registered immediately (loginid null) so public broadcasts aren't
+  // delayed by the session lookup; backfilled just after. A confirmation
+  // that fires in the sliver of time before this resolves would simply
+  // not arrive live for its owner -- not lost, since bots.js also loads
+  // pending confirmations on page load regardless.
+  sseClients.set(res, null);
+  currentLoginId(req)
+    .then((loginid) => {
+      if (sseClients.has(res)) sseClients.set(res, loginid);
+    })
+    .catch(() => {});
   req.on("close", () => sseClients.delete(res));
   // An unhandled 'error' event on a stream is a crash in Node (same class
   // of bug as the pg pool's 'error' listener above) -- a half-closed
@@ -452,7 +477,23 @@ app.get("/api/stream", (req, res) => {
 
 export function broadcast(event: string, data: unknown) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const client of sseClients) {
+  for (const client of sseClients.keys()) {
+    try {
+      client.write(payload);
+    } catch (err) {
+      console.error("Could not write to an SSE client, dropping it:", err);
+      sseClients.delete(client);
+    }
+  }
+}
+
+// For data that belongs to one specific user (e.g. their own pending bot
+// trade confirmation) -- unlike broadcast(), which is deliberately public
+// (ticks, signals), this never reaches any other connected client.
+export function broadcastToUser(loginid: string, event: string, data: unknown) {
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const [client, clientLoginid] of sseClients) {
+    if (clientLoginid !== loginid) continue;
     try {
       client.write(payload);
     } catch (err) {

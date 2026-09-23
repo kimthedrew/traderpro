@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { app, broadcast } from "./app.js";
+import { app, broadcast, broadcastToUser } from "./app.js";
 import { DerivClient } from "./derivClient.js";
 import { SignalDetector } from "./signals.js";
 import { recordSignal } from "./signalsStore.js";
@@ -22,7 +22,9 @@ async function startDerivFeed() {
     if (signal) {
       broadcast("signal", signal);
       recordSignal(signal).catch((err) => console.error("Could not persist signal (database unavailable?):", err));
-      runBotsForSignal(signal).catch((err) => console.error("Could not evaluate bots for signal (database unavailable?):", err));
+      runBotsForSignal(signal)
+        .then((confirmations) => confirmations.forEach((c) => broadcastToUser(c.ownerLoginid, "bot-confirmation-pending", c)))
+        .catch((err) => console.error("Could not evaluate bots for signal (database unavailable?):", err));
     }
   });
 

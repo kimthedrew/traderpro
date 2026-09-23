@@ -118,6 +118,35 @@ nav .container {
   font-family: inherit;
 }
 
+/* Shared real-money warning banner -- used by trade.html (always, while
+   that page is enabled) and bots.html (once Bot Builder's active mode,
+   which places real trades on confirmation, is on). */
+.real-money-banner {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text);
+  margin-bottom: 1.75rem;
+}
+
+.real-money-banner svg { width: 1.15rem; height: 1.15rem; flex: none; margin-top: 0.1rem; color: var(--warn); }
+.real-money-banner strong { color: var(--warn); }
+
+/* Calmer styling when the active account is demo -- no real money is at
+   risk, so this shouldn't compete visually with the real-account warning. */
+.real-money-banner.demo {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.real-money-banner.demo svg,
+.real-money-banner.demo strong { color: var(--accent); }
+
 .btn {
   font-size: 0.88rem;
   font-weight: 600;
@@ -136,6 +165,13 @@ nav .container {
 .btn-solid { background: var(--accent); color: #0b0d12; }
 .btn-solid:hover { filter: brightness(1.08); }
 .btn-lg { padding: 0.75rem 1.4rem; font-size: 0.95rem; }
+
+/* Real-money action buttons -- trade.html's "Place trade" and bots.html's
+   "Confirm" (Bot Builder active mode). Distinct from --accent so a real-
+   money action never looks like an ordinary branded button. */
+.btn-warn { background: var(--warn); color: #1a1204; }
+.btn-warn:hover { filter: brightness(1.08); }
+.btn-warn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
 
 /* ---- hero ---- */
 .hero { padding: 4.5rem 0 3rem; overflow: hidden; }

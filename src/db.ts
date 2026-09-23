@@ -151,6 +151,34 @@ async function runMigrations() {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS real_trades_owner_created_idx ON real_trades (owner_loginid, created_at DESC)`);
+
+  // Bot Builder "active" mode: a fired bot rule creates one of these
+  // instead of executing anything automatically -- a human still has to
+  // explicitly confirm before it becomes a real_trades row. See
+  // src/botTrading.ts and README "Bot Builder". bot_name is denormalized
+  // (not just bot_id) so listing pending confirmations never needs a join.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bot_trade_confirmations (
+      id BIGSERIAL PRIMARY KEY,
+      bot_id BIGINT NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+      bot_name TEXT NOT NULL,
+      owner_loginid TEXT NOT NULL REFERENCES users(loginid) ON DELETE CASCADE,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      stake DOUBLE PRECISION NOT NULL,
+      duration INTEGER NOT NULL,
+      signal_change_pct DOUBLE PRECISION NOT NULL,
+      signal_price DOUBLE PRECISION NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      real_trade_id BIGINT REFERENCES real_trades(id),
+      error_message TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      resolved_at TIMESTAMPTZ
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS bot_trade_confirmations_owner_status_idx ON bot_trade_confirmations (owner_loginid, status, created_at DESC)`,
+  );
 }
 
 // Runs once per process on first import. Fine at this schema size (two
