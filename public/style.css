@@ -2,20 +2,29 @@
   color-scheme: dark;
 
   /* Brand palette: one restrained accent, flat, muted graphite ground.
-     Keep --accent out of price-direction UI -- traders read
-     green=up/red=down as a hard convention, separate from --up/--down. */
-  --bg: #0b0d12;
-  --surface: #14171d;
-  --surface-raised: #191d24;
-  --border: #262b34;
+     Background/surface/border tones are Deriv's own dark-theme values
+     (pulled directly from the .dark block of the official App Builder
+     templates' globals.css, not eyeballed from screenshots) -- the
+     client asked to match those templates' look. --accent stays
+     traderpro's own blue (our logo/brand identity, not something the
+     templates dictate) and is kept out of price-direction UI -- traders
+     read green=up/red=down as a hard convention, separate from --up/--down. */
+  --bg: #181c25;
+  --surface: #1c212b;
+  --surface-raised: #232935;
+  --border: rgba(255, 255, 255, 0.1);
   --text: #e8eaed;
-  --text-muted: #8b909b;
+  --text-muted: #a3a3a3;
   --accent: #5b8def;
 
-  /* Semantic price-direction colors -- reserved for actual up/down
-     price movement, never for branding. */
-  --up: #2fae66;
-  --down: #d6524a;
+  /* Semantic price-direction colors -- reserved for actual up/down price
+     movement, never for branding. Deriv's own buy/sell brand colors
+     (their --buy-background / --sell-background), confirmed directly in
+     the App Builder templates' globals.css -- not our own invented
+     green/red, so Rise/Fall and ticker deltas genuinely match what the
+     templates use. */
+  --up: #00c390;
+  --down: #de0040;
 
   /* Real-money warning color -- distinct from --up/--down (those are
      reserved for price direction/PnL) and from --accent (branding). Used
@@ -42,7 +51,7 @@ nav {
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
-  background: rgba(11, 13, 18, 0.9);
+  background: rgba(24, 28, 37, 0.9);
   backdrop-filter: blur(8px);
   z-index: 10;
 }

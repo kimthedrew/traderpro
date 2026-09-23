@@ -322,6 +322,19 @@ table.
 
 ## Real Trading
 
+**Visual design matches Deriv's own App Builder templates' dark theme**,
+at the client's request. `public/style.css`'s `--bg`/`--surface`/
+`--surface-raised`/`--border`/`--up`/`--down` are Deriv's own dark-theme
+color tokens, pulled directly from the templates' `globals.css` (not
+eyeballed from screenshots) — in particular `--up`/`--down` are Deriv's
+real buy/sell brand colors (`#00c390` teal, `#de0040` crimson), not an
+invented green/red, so Rise/Fall buttons, the ticker, and Signals'
+direction arrows all genuinely match. Applied site-wide (not just
+`trade.html`) since the ask was "dark theme for all." `trade.js`'s canvas
+chart can't reference CSS custom properties, so its line/fill colors are
+kept as literal values in sync with the same two hex codes — if either
+changes, update both places.
+
 **The first feature here that places a real trade with real money** —
 Rise/Fall contracts only, on the account you're logged in as, feature-
 flagged off by default via `ENABLE_REAL_TRADING` (see `.env.example`).

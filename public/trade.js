@@ -81,7 +81,11 @@ function drawChart() {
   const xAt = (i) => pad + (i / (MAX_CHART_POINTS - 1)) * (w - pad * 2);
   const yAt = (q) => h - pad - ((q - min) / range) * (h - pad * 2);
   const up = chartPoints[chartPoints.length - 1].quote >= chartPoints[0].quote;
-  const lineColor = up ? "#2fae66" : "#d6524a";
+  // Deriv's own buy/sell brand colors (confirmed in their App Builder
+  // templates' globals.css), matching --up/--down in style.css -- canvas
+  // fillStyle/strokeStyle can't reference CSS custom properties, so these
+  // are kept as literal values in sync with those.
+  const lineColor = up ? "#00c390" : "#de0040";
 
   // Shaded area under the line, fading to transparent -- matches the
   // filled-chart look Deriv's own trading templates use.
@@ -91,8 +95,8 @@ function drawChart() {
   ctx.lineTo(xAt(chartPoints.length - 1), h - pad);
   ctx.closePath();
   const gradient = ctx.createLinearGradient(0, 0, 0, h);
-  gradient.addColorStop(0, up ? "rgba(47,174,102,0.28)" : "rgba(214,82,74,0.28)");
-  gradient.addColorStop(1, "rgba(47,174,102,0)");
+  gradient.addColorStop(0, up ? "rgba(0,195,144,0.28)" : "rgba(222,0,64,0.28)");
+  gradient.addColorStop(1, "rgba(0,195,144,0)");
   ctx.fillStyle = gradient;
   ctx.fill();
 
