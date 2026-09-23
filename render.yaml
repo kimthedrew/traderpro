@@ -22,6 +22,15 @@ services:
       # account. Raise or remove once the flow's been confirmed working.
       - key: REAL_TRADING_MAX_STAKE
         value: "1"
+      # Bot Builder "active" mode (see README "Bot Builder") -- requires
+      # ENABLE_REAL_TRADING above, since a bot-confirmed trade executes
+      # through that same code path. A matching bot rule only ever queues
+      # a pending confirmation; nothing places until a human confirms it
+      # on bots.html, so this is turned on for the same reason Real
+      # Trading was -- to let the client test it directly. Same
+      # REAL_TRADING_MAX_STAKE cap applies, re-checked at confirm time.
+      - key: ENABLE_BOT_TRADING
+        value: "true"
       # Pending on choosing a Postgres provider (Neon/Render/Supabase/etc) --
       # sync: false means Render won't manage this value; set it manually in
       # the dashboard once decided. Login/sessions degrade gracefully without
